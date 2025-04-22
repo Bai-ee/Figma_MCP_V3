@@ -273,6 +273,16 @@
         <div class="section">
           <div class="log-container" id="tools-log"></div>
           
+          <h2>Analyze</h2>
+          <div class="tool-group">
+            <button id="analyze-layers" class="secondary">
+              Analyze Layers
+            </button>
+            <button id="delete-layers" class="secondary" disabled>
+              Delete
+            </button>
+          </div>
+
           <h2>Design Tools</h2>
           <div class="tool-group">
             <button id="scan-text" class="secondary">
@@ -878,6 +888,23 @@
                 params: {
                   format: 'PNG',
                   scale: 2
+                }
+              }
+            }, '*');
+          };
+        }
+
+        // Analyze section buttons
+        const analyzeLayers = document.getElementById('analyze-layers');
+        if (analyzeLayers) {
+          analyzeLayers.onclick = () => {
+            addLogEntry('Starting layer analysis...', 'info');
+            parent.postMessage({ 
+              pluginMessage: { 
+                type: 'execute-command',
+                command: 'scan_nodes_by_types',
+                params: {
+                  types: ['FRAME', 'GROUP', 'COMPONENT', 'INSTANCE']
                 }
               }
             }, '*');
