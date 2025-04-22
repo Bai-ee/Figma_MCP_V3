@@ -897,17 +897,45 @@
         // Analyze section buttons
         const analyzeLayers = document.getElementById('analyze-layers');
         if (analyzeLayers) {
-          analyzeLayers.onclick = () => {
+          analyzeLayers.onclick = async () => {
             addLogEntry('Starting layer analysis...', 'info');
+            
+            // First get the current document info
             parent.postMessage({ 
               pluginMessage: { 
                 type: 'execute-command',
-                command: 'scan_nodes_by_types',
-                params: {
-                  types: ['FRAME', 'GROUP', 'COMPONENT', 'INSTANCE']
-                }
+                command: 'get_document_info',
+                params: {}
               }
             }, '*');
+
+            // Update the message handler to handle document info response
+            const originalMessageHandler = window.onmessage;
+            window.onmessage = (event) => {
+              const message = event.data.pluginMessage;
+              if (!message) return;
+
+              if (message.type === 'command-result' && message.result && message.result.id) {
+                // Got document info, now scan nodes using the document ID
+                addLogEntry('Got document info, scanning layers...', 'info');
+                parent.postMessage({ 
+                  pluginMessage: { 
+                    type: 'execute-command',
+                    command: 'scan_nodes_by_types',
+                    params: {
+                      nodeId: message.result.id,
+                      types: ['FRAME', 'GROUP', 'COMPONENT', 'INSTANCE']
+                    }
+                  }
+                }, '*');
+                
+                // Restore original message handler
+                window.onmessage = originalMessageHandler;
+              } else {
+                // Pass through to original handler
+                originalMessageHandler(event);
+              }
+            };
           };
         }
 
