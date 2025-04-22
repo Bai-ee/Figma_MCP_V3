@@ -167,6 +167,45 @@
       .operation-error {
         color: #ff9999;
       }
+      .tool-group {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+      }
+      .tool-group button {
+        flex: 1;
+        min-width: 120px;
+      }
+      /* Log styles */
+      .log-container {
+        background-color: #2d2d2d;
+        border: 1px solid #444444;
+        border-radius: 6px;
+        height: 75px;
+        margin-bottom: 16px;
+        overflow-y: auto;
+        padding: 8px;
+      }
+      .log-entry {
+        font-family: monospace;
+        font-size: 12px;
+        margin-bottom: 4px;
+        color: #e0e0e0;
+      }
+      .log-entry.success {
+        color: #4ade80;
+      }
+      .log-entry.error {
+        color: #ff9999;
+      }
+      .log-entry.info {
+        color: #66b3ff;
+      }
+      .log-entry .timestamp {
+        color: #999999;
+        margin-right: 8px;
+      }
     </style>
   </head>
   <body>
@@ -186,6 +225,7 @@
 
       <div class="tabs">
         <div id="tab-connection" class="tab active">Connection</div>
+        <div id="tab-tools" class="tab">Tools</div>
         <div id="tab-about" class="tab">About</div>
       </div>
 
@@ -225,6 +265,39 @@
           <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px;">
             <div id="progress-status">Not started</div>
             <div id="progress-percentage">0%</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="content-tools" class="tab-content">
+        <div class="section">
+          <div class="log-container" id="tools-log"></div>
+          
+          <h2>Design Tools</h2>
+          <div class="tool-group">
+            <button id="scan-text" class="secondary">
+              Scan Text Nodes
+            </button>
+            <button id="scan-components" class="secondary">
+              Scan Components
+            </button>
+          </div>
+          
+          <h2>Layout Tools</h2>
+          <div class="tool-group">
+            <button id="create-frame" class="secondary">
+              Create Frame
+            </button>
+            <button id="create-auto-layout" class="secondary">
+              Create Auto-Layout
+            </button>
+          </div>
+
+          <h2>Export Tools</h2>
+          <div class="tool-group">
+            <button id="export-selection" class="secondary">
+              Export Selection
+            </button>
           </div>
         </div>
       </div>
@@ -295,6 +368,10 @@
         connectButton.disabled = isConnected;
         disconnectButton.disabled = !isConnected;
         portInput.disabled = isConnected;
+
+        // Add log entry for connection status
+        addLogEntry(message || (isConnected ? "Connected to Cursor MCP server" : "Not connected to Cursor MCP server"), 
+          isConnected ? 'success' : 'error');
       }
 
       // Connect to WebSocket server
@@ -306,12 +383,13 @@
           }
 
           state.serverPort = port;
+          addLogEntry(`Attempting to connect to WebSocket server on port ${port}...`, 'info');
           state.socket = new WebSocket(`ws://localhost:${port}`);
 
           state.socket.onopen = () => {
             // Generate random channel name
             const channelName = generateChannelName();
-            console.log("Joining channel:", channelName);
+            addLogEntry(`WebSocket connection established, joining channel: ${channelName}`, 'info');
             state.channel = channelName;
 
             // Join the channel using the same format as App.tsx
@@ -337,6 +415,7 @@
                     true,
                     `Connected to server on port ${port} in channel: <strong>${channelName}</strong>`
                   );
+                  addLogEntry(`Successfully joined channel: ${channelName}`, 'success');
 
                   // Notify the plugin code
                   parent.postMessage(
@@ -352,12 +431,14 @@
               } else if (data.type === "error") {
                 console.error("Error:", data.message);
                 updateConnectionStatus(false, `Error: ${data.message}`);
+                addLogEntry(`WebSocket error: ${data.message}`, 'error');
                 state.socket.close();
               }
 
               handleSocketMessage(data);
             } catch (error) {
               console.error("Error parsing message:", error);
+              addLogEntry(`Error parsing WebSocket message: ${error.message}`, 'error');
             }
           };
 
@@ -365,11 +446,13 @@
             state.connected = false;
             state.socket = null;
             updateConnectionStatus(false, "Disconnected from server");
+            addLogEntry("WebSocket connection closed", 'info');
           };
 
           state.socket.onerror = (error) => {
             console.error("WebSocket error:", error);
             updateConnectionStatus(false, "Connection error");
+            addLogEntry(`WebSocket error: ${error.message || 'Unknown error'}`, 'error');
             state.connected = false;
             state.socket = null;
           };
@@ -379,12 +462,14 @@
             false,
             `Connection error: ${error.message || "Unknown error"}`
           );
+          addLogEntry(`Connection error: ${error.message || 'Unknown error'}`, 'error');
         }
       }
 
       // Disconnect from websocket server
       function disconnectFromServer() {
         if (state.socket) {
+          addLogEntry("Disconnecting from WebSocket server...", 'info');
           state.socket.close();
           state.socket = null;
           state.connected = false;
@@ -397,14 +482,21 @@
         const data = payload.message;
         console.log("handleSocketMessage", data);
 
+        // Log incoming commands
+        if (data.command) {
+          addLogEntry(`Received command: ${data.command}`, 'info');
+        }
+
         // If it's a response to a previous request
         if (data.id && state.pendingRequests.has(data.id)) {
           const { resolve, reject } = state.pendingRequests.get(data.id);
           state.pendingRequests.delete(data.id);
 
           if (data.error) {
+            addLogEntry(`Request ${data.id} failed: ${data.error}`, 'error');
             reject(new Error(data.error));
           } else {
+            addLogEntry(`Request ${data.id} completed successfully`, 'success');
             resolve(data.result);
           }
           return;
@@ -427,6 +519,7 @@
             );
           } catch (error) {
             // Send error back to WebSocket
+            addLogEntry(`Error executing command: ${error.message}`, 'error');
             sendErrorResponse(
               data.id,
               error.message || "Error executing command"
@@ -650,6 +743,171 @@
             break;
         }
       };
+
+      // Log functionality
+      function addLogEntry(message, type = 'info') {
+        const logContainer = document.getElementById('tools-log');
+        if (!logContainer) return;
+
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${type}`;
+        
+        const timestamp = document.createElement('span');
+        timestamp.className = 'timestamp';
+        timestamp.textContent = new Date().toLocaleTimeString();
+        
+        entry.appendChild(timestamp);
+        entry.appendChild(document.createTextNode(message));
+        
+        logContainer.appendChild(entry);
+        
+        // Ensure the new entry is scrolled into view
+        requestAnimationFrame(() => {
+          entry.scrollIntoView({ behavior: 'smooth', block: 'end' });
+          // Double-check scroll position after a small delay to ensure content is rendered
+          setTimeout(() => {
+            logContainer.scrollTop = logContainer.scrollHeight;
+          }, 100);
+        });
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        // Tab handling
+        const tabs = document.querySelectorAll('.tab');
+        const contents = document.querySelectorAll('.tab-content');
+        
+        tabs.forEach(tab => {
+          tab.addEventListener('click', () => {
+            // Remove active class from all tabs and contents
+            tabs.forEach(t => t.classList.remove('active'));
+            contents.forEach(c => c.classList.remove('active'));
+            
+            // Add active class to clicked tab and corresponding content
+            tab.classList.add('active');
+            const contentId = `content-${tab.id.split('-')[1]}`;
+            document.getElementById(contentId).classList.add('active');
+          });
+        });
+
+        // Tools tab functionality
+        const scanTextBtn = document.getElementById('scan-text');
+        const scanComponentsBtn = document.getElementById('scan-components');
+        const createFrameBtn = document.getElementById('create-frame');
+        const createAutoLayoutBtn = document.getElementById('create-auto-layout');
+        const exportSelectionBtn = document.getElementById('export-selection');
+
+        if (scanTextBtn) {
+          scanTextBtn.onclick = () => {
+            addLogEntry('Starting text node scan...', 'info');
+            parent.postMessage({ 
+              pluginMessage: { 
+                type: 'execute-command',
+                command: 'scan_text_nodes',
+                params: {}
+              }
+            }, '*');
+          };
+        }
+
+        if (scanComponentsBtn) {
+          scanComponentsBtn.onclick = () => {
+            addLogEntry('Scanning for local components...', 'info');
+            parent.postMessage({ 
+              pluginMessage: { 
+                type: 'execute-command',
+                command: 'get_local_components',
+                params: {}
+              }
+            }, '*');
+          };
+        }
+
+        if (createFrameBtn) {
+          createFrameBtn.onclick = () => {
+            addLogEntry('Creating new frame...', 'info');
+            parent.postMessage({ 
+              pluginMessage: { 
+                type: 'execute-command',
+                command: 'create_frame',
+                params: {
+                  x: 0,
+                  y: 0,
+                  width: 400,
+                  height: 300,
+                  name: 'New Frame'
+                }
+              }
+            }, '*');
+          };
+        }
+
+        if (createAutoLayoutBtn) {
+          createAutoLayoutBtn.onclick = () => {
+            addLogEntry('Creating auto-layout frame...', 'info');
+            parent.postMessage({ 
+              pluginMessage: { 
+                type: 'execute-command',
+                command: 'create_frame',
+                params: {
+                  x: 0,
+                  y: 0,
+                  width: 400,
+                  height: 300,
+                  name: 'Auto-Layout Frame',
+                  layoutMode: 'VERTICAL',
+                  layoutSizingHorizontal: 'HUG',
+                  layoutSizingVertical: 'HUG',
+                  itemSpacing: 10,
+                  paddingTop: 16,
+                  paddingRight: 16,
+                  paddingBottom: 16,
+                  paddingLeft: 16
+                }
+              }
+            }, '*');
+          };
+        }
+
+        if (exportSelectionBtn) {
+          exportSelectionBtn.onclick = () => {
+            addLogEntry('Preparing to export selection...', 'info');
+            parent.postMessage({ 
+              pluginMessage: { 
+                type: 'execute-command',
+                command: 'export_node_as_image',
+                params: {
+                  format: 'PNG',
+                  scale: 2
+                }
+              }
+            }, '*');
+          };
+        }
+
+        // Add log entries for command results and errors
+        window.addEventListener('message', (event) => {
+          const message = event.data.pluginMessage;
+          if (!message) return;
+
+          switch (message.type) {
+            case 'command-result':
+              addLogEntry(`Operation completed successfully: ${JSON.stringify(message.result)}`, 'success');
+              break;
+            case 'command-error':
+              addLogEntry(`Error: ${message.error}`, 'error');
+              break;
+            case 'command_progress':
+              if (message.status === 'started') {
+                addLogEntry(`Operation started: ${message.message}`, 'info');
+              } else if (message.status === 'completed') {
+                addLogEntry(`Operation completed: ${message.message}`, 'success');
+              } else if (message.status === 'error') {
+                addLogEntry(`Operation failed: ${message.message}`, 'error');
+              }
+              break;
+          }
+        });
+      });
     </script>
   </body>
 </html>
