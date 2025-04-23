@@ -406,6 +406,28 @@
       .api-key-status.invalid {
         color: #ff9999;
       }
+      .status-message {
+        display: none;
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 8px 16px;
+        border-radius: 4px;
+        font-size: 14px;
+        z-index: 1000;
+        transition: opacity 0.3s ease;
+      }
+      .status-message.success {
+        display: block;
+        background-color: #4CAF50;
+        color: white;
+      }
+      .status-message.error {
+        display: block;
+        background-color: #f44336;
+        color: white;
+      }
     </style>
   </head>
   <body>
@@ -429,6 +451,8 @@
         <div id="tab-tile" class="tab"> Map & Sprites</div>
         <div id="tab-about" class="tab">Chat</div>
       </div>
+
+      <div id="status" class="status-message"></div>
 
       <div id="content-connection" class="tab-content active">
         <div class="section">
@@ -1506,19 +1530,82 @@
 
         if (exportSelectionBtn) {
           exportSelectionBtn.onclick = () => {
-            addLogEntry('Preparing to export selection...', 'info');
+            console.log('📤 Export button clicked');
+            addLogEntry('Getting current selection...', 'info');
+            
+            // Send message directly to plugin to get selection and export
             parent.postMessage({ 
               pluginMessage: { 
-                type: 'execute-command',
-                command: 'export_node_as_image',
-                params: {
-                  format: 'PNG',
-                  scale: 2
-                }
+                type: 'export-selection'
               }
             }, '*');
           };
         }
+
+        // Update message handler to handle selection info and export result
+        window.addEventListener('message', async (event) => {
+          const message = event.data.pluginMessage;
+          if (!message) return;
+
+          if (message.type === 'export-result') {
+            console.log('Received export result:', message);
+            const statusElement = document.getElementById('status');
+            
+            if (message.success) {
+              try {
+                // Create blob from bytes
+                const mimeType = `image/${message.format.toLowerCase()}`;
+                const blob = new Blob([message.bytes], { type: mimeType });
+                
+                // Create and trigger download
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = message.filename;
+                document.body.appendChild(link);
+                
+                // Log export details
+                addLogEntry('Export successful!', 'success');
+                if (message.details) {
+                  addLogEntry(`Exported ${message.details.nodeType} "${message.details.nodeName}"`, 'info');
+                  addLogEntry(`Size: ${message.details.dimensions}, ${message.details.size}`, 'info');
+                }
+                
+                // Trigger download
+                link.click();
+                
+                // Cleanup
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+                
+                // Show success message
+                statusElement.textContent = 'Export successful! File download started.';
+                statusElement.className = 'status-message success';
+                setTimeout(() => {
+                  statusElement.className = 'status-message';
+                }, 3000);
+                
+                console.log('Download triggered successfully');
+              } catch (error) {
+                console.error('Error during download:', error);
+                addLogEntry(`Error during download: ${error.message}`, 'error');
+                statusElement.textContent = 'Error during download: ' + error.message;
+                statusElement.className = 'status-message error';
+                setTimeout(() => {
+                  statusElement.className = 'status-message';
+                }, 5000);
+              }
+            } else {
+              console.error('Export failed:', message.error);
+              addLogEntry(`Export failed: ${message.error}`, 'error');
+              statusElement.textContent = message.error || 'Export failed';
+              statusElement.className = 'status-message error';
+              setTimeout(() => {
+                statusElement.className = 'status-message';
+              }, 5000);
+            }
+          }
+          // ... existing code ...
+        });
 
         // Analyze section buttons
         const analyzeLayers = document.getElementById('analyze-layers');
@@ -1753,73 +1840,6 @@
             }, '*');
           } catch (error) {
             addLogEntry(`❌ Export failed: ${error.message}`, 'error', 'tile-log');
-          }
-        });
-
-        // Update message handler for new commands
-        window.addEventListener('message', async (event) => {
-          const message = event.data.pluginMessage;
-          if (!message) return;
-
-          switch (message.type) {
-            case 'command-result':
-              if (message.command === 'export_phaser_map' && message.result?.success) {
-                try {
-                  const mapData = message.result.mapData;
-                  const filename = `${mapData.tilesets[0].name || 'tilemap'}.json`;
-                  
-                  addLogEntry('✨ Map data received, preparing download...', 'info', 'tile-log');
-                  
-                  // Create the JSON content
-                  const dataStr = JSON.stringify(mapData, null, 2);
-                  const blob = new Blob([dataStr], { type: 'application/json' });
-                  const url = URL.createObjectURL(blob);
-
-                  // Create download link
-                  const downloadLink = document.createElement('a');
-                  downloadLink.href = url;
-                  downloadLink.download = filename;
-                  downloadLink.style.display = 'none';
-                  
-                  addLogEntry('📎 Created download link...', 'info', 'tile-log');
-
-                  // Add link to document and click it
-                  document.body.appendChild(downloadLink);
-                  addLogEntry('🖱️ Triggering download...', 'info', 'tile-log');
-                  downloadLink.click();
-                  
-                  // Cleanup
-                  document.body.removeChild(downloadLink);
-                  setTimeout(() => URL.revokeObjectURL(url), 100);
-                  
-                  addLogEntry('✅ Download started!', 'success', 'tile-log');
-                  addLogEntry(`💾 File name: ${filename}`, 'info', 'tile-log');
-                  addLogEntry('📂 Check your downloads folder', 'info', 'tile-log');
-
-                  // Add detailed export summary
-                  const summary = {
-                    filename: filename,
-                    size: `${mapData.width}x${mapData.height}`,
-                    tileSize: `${mapData.tilewidth}x${mapData.tileheight}`,
-                    totalTiles: mapData.tilesets[0].tilecount,
-                    tileset: mapData.tilesets[0].name,
-                    format: 'Phaser Tilemap JSON'
-                  };
-                  
-                  addLogEntry('📑 Export Summary:', 'info', 'tile-log');
-                  addLogEntry(summary, 'info', 'tile-log');
-
-                } catch (error) {
-                  addLogEntry(`❌ Error during download: ${error.message}`, 'error', 'tile-log');
-                }
-              }
-              break;
-              
-            case 'command-error':
-              if (message.command === 'export_phaser_map') {
-                addLogEntry(`❌ Export failed: ${message.error}`, 'error', 'tile-log');
-              }
-              break;
           }
         });
 

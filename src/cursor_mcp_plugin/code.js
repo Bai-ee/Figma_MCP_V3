@@ -107,7 +107,7 @@ async function callOpenAI(message) {
 
 // Handle messages from the UI
 figma.ui.onmessage = async (msg) => {
-  console.log('Received message:', msg);
+  console.log("Plugin received message:", msg);
 
   switch (msg.type) {
     case 'save-api-key':
@@ -184,6 +184,110 @@ figma.ui.onmessage = async (msg) => {
         });
       }
       break;
+    
+    case 'get-selection-info':
+      console.log("Getting selection info via Figma API");
+      const selection = figma.currentPage.selection;
+      
+      // Map selection to include only necessary properties
+      const selectionInfo = selection.map(node => ({
+        id: node.id,
+        name: node.name,
+        type: node.type,
+        visible: node.visible,
+        locked: node.locked,
+        width: node.width,
+        height: node.height,
+        x: node.x,
+        y: node.y,
+        parent: node.parent ? {
+          id: node.parent.id,
+          type: node.parent.type,
+          name: node.parent.name
+        } : null
+      }));
+      
+      console.log("Selection info:", selectionInfo);
+      
+      // Send selection info back to UI
+      figma.ui.postMessage({
+        type: 'selection-info',
+        selection: selectionInfo
+      });
+      break;
+    
+    case 'export-selection':
+      console.log("Handling export request via Figma API");
+      try {
+        // Get current selection
+        const selection = figma.currentPage.selection;
+        console.log("Current selection:", selection);
+        
+        // Validate selection
+        if (!selection || selection.length === 0) {
+          throw new Error('No element selected. Please select an element to export.');
+        }
+        
+        if (selection.length > 1) {
+          console.log("Multiple elements selected, using first element");
+        }
+        
+        const node = selection[0];
+        
+        // Validate node can be exported
+        if (!node.exportAsync) {
+          throw new Error(`Selected element of type "${node.type}" cannot be exported. Please select a different element.`);
+        }
+        
+        console.log("Preparing to export node:", {
+          id: node.id,
+          name: node.name,
+          type: node.type,
+          width: node.width,
+          height: node.height
+        });
+
+        // Set up export settings
+        const settings = {
+          format: 'PNG',
+          constraint: { type: 'SCALE', value: 2 }
+        };
+
+        // Export the node
+        console.log("Exporting with settings:", settings);
+        const bytes = await node.exportAsync(settings);
+        
+        // Log success and details
+        const details = {
+          nodeId: node.id,
+          nodeName: node.name,
+          nodeType: node.type,
+          format: settings.format,
+          scale: settings.constraint.value,
+          size: `${bytes.length} bytes`,
+          dimensions: `${Math.round(node.width)} x ${Math.round(node.height)}`
+        };
+        
+        console.log("Export successful:", details);
+        
+        // Send success message back to UI with the bytes for download
+        figma.ui.postMessage({
+          type: 'export-result',
+          success: true,
+          details: details,
+          bytes: bytes,
+          format: settings.format,
+          filename: `${node.name || 'export'}.${settings.format.toLowerCase()}`
+        });
+      } catch (error) {
+        console.error("Export failed:", error);
+        figma.ui.postMessage({
+          type: 'export-result',
+          success: false,
+          error: error.message || 'Export failed for unknown reason'
+        });
+      }
+      break;
   }
 };
 
@@ -205,93 +309,123 @@ function updateSettings(settings) {
 
 // Handle commands from UI
 async function handleCommand(command, params) {
-  console.log("Handling command:", command, "with params:", params);
-  
-  switch (command) {
-    case "get_document_info":
-      return await getDocumentInfo();
-    case "get_selection":
-      return await getSelection();
-    case "get_node_info":
-      if (!params || !params.nodeId) {
-        throw new Error("Missing nodeId parameter");
-      }
-      return await getNodeInfo(params.nodeId);
-    case "get_nodes_info":
-      if (!params || !params.nodeIds || !Array.isArray(params.nodeIds)) {
-        throw new Error("Missing or invalid nodeIds parameter");
-      }
-      return await getNodesInfo(params.nodeIds);
-    case "read_my_design":
-      return await readMyDesign();
-    case "create_rectangle":
-      return await createRectangle(params);
-    case "create_frame":
-      return await createFrame(params);
-    case "create_text":
-      return await createText(params);
-    case "set_fill_color":
-      return await setFillColor(params);
-    case "set_stroke_color":
-      return await setStrokeColor(params);
-    case "move_node":
-      return await moveNode(params);
-    case "resize_node":
-      return await resizeNode(params);
-    case "delete_node":
-      return await deleteNode(params);
-    case "delete_multiple_nodes":
-      return await deleteMultipleNodes(params);
-    case "get_styles":
-      return await getStyles();
-    case "get_local_components":
-      return await getLocalComponents();
-    // case "get_team_components":
-    //   return await getTeamComponents();
-    case "create_component_instance":
-      return await createComponentInstance(params);
-    case "export_node_as_image":
-      return await exportNodeAsImage(params);
-    case "set_corner_radius":
-      return await setCornerRadius(params);
-    case "set_text_content":
-      return await setTextContent(params);
-    case "clone_node":
-      return await cloneNode(params);
-    case "scan_text_nodes":
-      return await scanTextNodes(params);
-    case "set_multiple_text_contents":
-      return await setMultipleTextContents(params);
-    case "get_annotations":
-      return await getAnnotations(params);
-    case "set_annotation":
-      return await setAnnotation(params);
-    case "scan_nodes_by_types":
-      return await scanNodesByTypes(params);
-    case "set_multiple_annotations":
-      return await setMultipleAnnotations(params);
-    case "set_layout_mode":
-      return await setLayoutMode(params);
-    case "set_padding":
-      return await setPadding(params);
-    case "set_axis_align":
-      return await setAxisAlign(params);
-    case "set_layout_sizing":
-      return await setLayoutSizing(params);
-    case "set_item_spacing":
-      return await setItemSpacing(params);
-    case "analyze_selection":
-      return await analyzeSelection();
-    case "convert_to_frame":
-      return await convertToFrame();
-    case "create_grid_frame":
-      return await createGridFrame(params);
-    case "snap_to_grid":
-      return await snapToGrid(params);
-    case "export_phaser_map":
-      return await exportPhaserMap(params);
-    default:
-      throw new Error(`Unknown command: ${command}`);
+  console.log('Handling command:', command, 'with params:', params);
+  try {
+    switch (command) {
+      case "get_document_info":
+        return await getDocumentInfo();
+      case "get_selection":
+        return await getSelection();
+      case "get_node_info":
+        if (!params || !params.nodeId) {
+          throw new Error("Missing nodeId parameter");
+        }
+        return await getNodeInfo(params.nodeId);
+      case "get_nodes_info":
+        if (!params || !params.nodeIds || !Array.isArray(params.nodeIds)) {
+          throw new Error("Missing or invalid nodeIds parameter");
+        }
+        return await getNodesInfo(params.nodeIds);
+      case "read_my_design":
+        return await readMyDesign();
+      case "create_rectangle":
+        return await createRectangle(params);
+      case "create_frame":
+        return await createFrame(params);
+      case "create_text":
+        return await createText(params);
+      case "set_fill_color":
+        return await setFillColor(params);
+      case "set_stroke_color":
+        return await setStrokeColor(params);
+      case "move_node":
+        return await moveNode(params);
+      case "resize_node":
+        return await resizeNode(params);
+      case "delete_node":
+        return await deleteNode(params);
+      case "delete_multiple_nodes":
+        return await deleteMultipleNodes(params);
+      case "get_styles":
+        return await getStyles();
+      case "get_local_components":
+        return await getLocalComponents();
+      case "create_component_instance":
+        return await createComponentInstance(params);
+      case "export_node_as_image":
+        try {
+          const { nodeId, format = 'PNG', scale = 2 } = params;
+          console.log(`Exporting node ${nodeId} as ${format} with scale ${scale}`);
+          
+          const node = figma.getNodeById(nodeId);
+          if (!node) {
+            throw new Error('Node not found');
+          }
+
+          const settings = {
+            format: format,
+            constraint: { type: 'SCALE', value: scale }
+          };
+
+          const bytes = await node.exportAsync(settings);
+          console.log('Export successful, size:', bytes.length, 'bytes');
+          
+          sendCommandResult('export_node_as_image', { success: true });
+        } catch (error) {
+          console.error('Export failed:', error);
+          sendCommandResult('export_node_as_image', { 
+            success: false, 
+            error: error.message 
+          });
+        }
+        break;
+      case "set_corner_radius":
+        return await setCornerRadius(params);
+      case "set_text_content":
+        return await setTextContent(params);
+      case "clone_node":
+        return await cloneNode(params);
+      case "scan_text_nodes":
+        return await scanTextNodes(params);
+      case "set_multiple_text_contents":
+        return await setMultipleTextContents(params);
+      case "get_annotations":
+        return await getAnnotations(params);
+      case "set_annotation":
+        return await setAnnotation(params);
+      case "scan_nodes_by_types":
+        return await scanNodesByTypes(params);
+      case "set_multiple_annotations":
+        return await setMultipleAnnotations(params);
+      case "set_layout_mode":
+        return await setLayoutMode(params);
+      case "set_padding":
+        return await setPadding(params);
+      case "set_axis_align":
+        return await setAxisAlign(params);
+      case "set_layout_sizing":
+        return await setLayoutSizing(params);
+      case "set_item_spacing":
+        return await setItemSpacing(params);
+      case "analyze_selection":
+        return await analyzeSelection();
+      case "convert_to_frame":
+        return await convertToFrame();
+      case "create_grid_frame":
+        return await createGridFrame(params);
+      case "snap_to_grid":
+        return await snapToGrid(params);
+      case "export_phaser_map":
+        return await exportPhaserMap(params);
+      default:
+        throw new Error(`Unknown command: ${command}`);
+    }
+  } catch (error) {
+    console.error('Command failed:', error);
+    sendCommandResult(command, { 
+      success: false, 
+      error: error.message 
+    });
   }
 }
 
@@ -986,25 +1120,6 @@ async function getLocalComponents() {
   };
 }
 
-// async function getTeamComponents() {
-//   try {
-//     const teamComponents =
-//       await figma.teamLibrary.getAvailableComponentsAsync();
-
-//     return {
-//       count: teamComponents.length,
-//       components: teamComponents.map((component) => ({
-//         key: component.key,
-//         name: component.name,
-//         description: component.description,
-//         libraryName: component.libraryName,
-//       })),
-//     };
-//   } catch (error) {
-//     throw new Error(`Error getting team components: ${error.message}`);
-//   }
-// }
-
 async function createComponentInstance(params) {
   const { componentKey, x = 0, y = 0 } = params || {};
 
@@ -1033,117 +1148,6 @@ async function createComponentInstance(params) {
   } catch (error) {
     throw new Error(`Error creating component instance: ${error.message}`);
   }
-}
-
-async function exportNodeAsImage(params) {
-  const { nodeId, scale = 1 } = params || {};
-
-  const format = "PNG";
-
-  if (!nodeId) {
-    throw new Error("Missing nodeId parameter");
-  }
-
-  const node = await figma.getNodeByIdAsync(nodeId);
-  if (!node) {
-    throw new Error(`Node not found with ID: ${nodeId}`);
-  }
-
-  if (!("exportAsync" in node)) {
-    throw new Error(`Node does not support exporting: ${nodeId}`);
-  }
-
-  try {
-    const settings = {
-      format: format,
-      constraint: { type: "SCALE", value: scale },
-    };
-
-    const bytes = await node.exportAsync(settings);
-
-    let mimeType;
-    switch (format) {
-      case "PNG":
-        mimeType = "image/png";
-        break;
-      case "JPG":
-        mimeType = "image/jpeg";
-        break;
-      case "SVG":
-        mimeType = "image/svg+xml";
-        break;
-      case "PDF":
-        mimeType = "application/pdf";
-        break;
-      default:
-        mimeType = "application/octet-stream";
-    }
-
-    // Proper way to convert Uint8Array to base64
-    const base64 = customBase64Encode(bytes);
-    // const imageData = `data:${mimeType};base64,${base64}`;
-
-    return {
-      nodeId,
-      format,
-      scale,
-      mimeType,
-      imageData: base64,
-    };
-  } catch (error) {
-    throw new Error(`Error exporting node as image: ${error.message}`);
-  }
-}
-function customBase64Encode(bytes) {
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  let base64 = "";
-
-  const byteLength = bytes.byteLength;
-  const byteRemainder = byteLength % 3;
-  const mainLength = byteLength - byteRemainder;
-
-  let a, b, c, d;
-  let chunk;
-
-  // Main loop deals with bytes in chunks of 3
-  for (let i = 0; i < mainLength; i = i + 3) {
-    // Combine the three bytes into a single integer
-    chunk = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
-
-    // Use bitmasks to extract 6-bit segments from the triplet
-    a = (chunk & 16515072) >> 18; // 16515072 = (2^6 - 1) << 18
-    b = (chunk & 258048) >> 12; // 258048 = (2^6 - 1) << 12
-    c = (chunk & 4032) >> 6; // 4032 = (2^6 - 1) << 6
-    d = chunk & 63; // 63 = 2^6 - 1
-
-    // Convert the raw binary segments to the appropriate ASCII encoding
-    base64 += chars[a] + chars[b] + chars[c] + chars[d];
-  }
-
-  // Deal with the remaining bytes and padding
-  if (byteRemainder === 1) {
-    chunk = bytes[mainLength];
-
-    a = (chunk & 252) >> 2; // 252 = (2^6 - 1) << 2
-
-    // Set the 4 least significant bits to zero
-    b = (chunk & 3) << 4; // 3 = 2^2 - 1
-
-    base64 += chars[a] + chars[b] + "==";
-  } else if (byteRemainder === 2) {
-    chunk = (bytes[mainLength] << 8) | bytes[mainLength + 1];
-
-    a = (chunk & 64512) >> 10; // 64512 = (2^6 - 1) << 10
-    b = (chunk & 1008) >> 4; // 1008 = (2^6 - 1) << 4
-
-    // Set the 2 least significant bits to zero
-    c = (chunk & 15) << 2; // 15 = 2^4 - 1
-
-    base64 += chars[a] + chars[b] + chars[c] + "=";
-  }
-
-  return base64;
 }
 
 async function setCornerRadius(params) {
