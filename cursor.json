@@ -1,0 +1,201 @@
+{
+    "pluginType": "figma",
+    "scope": "strict",
+    "rules": {
+      "enforced": true,
+      "doNotTouch": [
+        "src/talk_to_figma_mcp",
+        "src/cursor_mcp_plugin",
+        "src/socket.ts",
+        "apps/mcp",
+        "libs/mcp",
+        "packages/mcp",
+        "external-libs/*"
+      ],
+      "onlyUse": ["Figma Plugin API"],
+      "excludeTechnologies": [
+        "Node Web APIs",
+        "DOM",
+        "Canvas API",
+        "React",
+        "Next.js",
+        "Puppeteer",
+        "Electron",
+        "HTML5 Canvas",
+        "Express",
+        "React Native",
+        "Browser-based scripting"
+      ],
+      "trustedPaths": [
+        "plugins/figma-plugin-*",
+        "tools/figma-plugin-utils"
+      ]
+    },
+    "figmaPluginGuidelines": {
+      "language": "TypeScript",
+      "ui": {
+        "technologies": ["HTML", "CSS", "Vanilla JS only"],
+        "communications": ["window.onmessage", "parent.postMessage"],
+        "debug": {
+          "domReady": true,
+          "logging": true,
+          "eventTracking": true
+        }
+      },
+      "storage": {
+        "use": ["figma.clientStorage"]
+      },
+      "fonts": {
+        "load": ["figma.loadFontAsync"]
+      },
+      "nodes": {
+        "traverse": ["findAll", "findOne", "getSelection", "getDocumentInfo"],
+        "create": ["createRectangle", "createFrame", "createText"],
+        "modify": [
+          "set_text_content",
+          "set_multiple_text_contents",
+          "set_fill_color",
+          "set_stroke_color",
+          "set_corner_radius",
+          "resize_node",
+          "move_node",
+          "delete_node",
+          "clone_node"
+        ],
+        "organize": ["get_styles", "get_local_components", "create_component_instance"]
+      },
+      "execution": {
+        "entry": "code.ts",
+        "ui": "ui.html",
+        "channelRequired": true
+      },
+      "connection": {
+        "usesWebSocket": true,
+        "requiresJoinChannel": true
+      }
+    },
+    "debugging": {
+      "loggingPrefixes": ["[Plugin]", "[Debug]", "[UI]"],
+      "bestPractices": {
+        "logSuccessAndFailures": true,
+        "catchAllErrors": true,
+        "trackState": true,
+        "separateUIAndLogic": true
+      },
+      "domContentInitialization": true,
+      "safeEventListeners": true,
+      "messageSchemaValidation": true
+    },
+    "strategy": {
+      "uiStructure": "tabbed",
+      "tabCreationProcess": {
+        "steps": [
+          {
+            "step": 1,
+            "name": "UI Structure",
+            "tasks": [
+              "Add new tab button in ui.html tabs section",
+              "Create corresponding tab content div with unique ID",
+              "Add log container for feature-specific logging",
+              "Include necessary input fields and buttons"
+            ]
+          },
+          {
+            "step": 2,
+            "name": "Command Implementation",
+            "tasks": [
+              "Add command handler in code.js",
+              "Implement using direct Figma API calls",
+              "Include detailed console logging with emojis for visibility",
+              "Follow analyze_selection pattern for consistency",
+              "Return structured response object"
+            ],
+            "codePattern": {
+              "logging": [
+                "Start: console.log('🎯 Starting operation...')",
+                "Progress: console.log('📝 Processing step...')",
+                "Details: console.log('🔍 Details:', { data })",
+                "Success: console.log('✅ Operation complete')",
+                "Error: console.log('❌ Error:', error)"
+              ],
+              "errorHandling": "Use try-catch with specific error messages",
+              "responseFormat": {
+                "success": "Return operation result object",
+                "error": "Throw Error with descriptive message"
+              }
+            }
+          },
+          {
+            "step": 3,
+            "name": "UI Event Handlers",
+            "tasks": [
+              "Add event listeners in DOMContentLoaded",
+              "Implement click handlers with console logging",
+              "Use parent.postMessage for plugin communication",
+              "Add log entries for operation progress"
+            ],
+            "messagePattern": {
+              "command": {
+                "type": "execute-command",
+                "command": "command_name",
+                "params": {}
+              },
+              "logging": {
+                "start": "addLogEntry('Starting operation...', 'info')",
+                "success": "addLogEntry('Operation complete', 'success')",
+                "error": "addLogEntry('Error: ' + error, 'error')"
+              }
+            }
+          },
+          {
+            "step": 4,
+            "name": "Message Handling",
+            "tasks": [
+              "Add case in window.onmessage handler",
+              "Process command results and errors",
+              "Update UI based on response",
+              "Maintain consistent logging pattern"
+            ]
+          }
+        ],
+        "bestPractices": [
+          "Use direct Figma API calls through the plugin",
+          "Include detailed console logging with emojis",
+          "Follow the analyze functionality pattern",
+          "Implement proper error handling",
+          "Provide immediate visual feedback",
+          "Keep UI and plugin code separate",
+          "Use consistent naming conventions"
+        ],
+        "example": {
+          "commandImplementation": "async function commandName() { console.log('🎯 Starting...'); try { /* Figma API calls */ } catch (error) { console.error('❌', error); throw error; } }",
+          "uiHandler": "button.onclick = () => { console.log('👆 Button clicked'); addLogEntry('Starting...', 'info'); parent.postMessage({/*...*/}, '*'); }"
+        }
+      },
+      "modularity": {
+        "pattern": "Each UI tab in ui.html corresponds to a separate JS module (e.g., tile.js, export.js, paint.js)",
+        "goal": "Keep feature logic isolated, maintainable, and easy to test individually",
+        "communication": "All inter-module coordination happens through postMessage to and from Figma's plugin environment",
+        "folderConvention": "Store all JS feature modules in /ui/js/ and load dynamically per tab via script tags or bundler"
+      },
+      "pluginFlow": {
+        "tabInit": "Each tab initializes its JS logic via DOMContentLoaded",
+        "eventHandling": "Modules should attach events only when their tab is active",
+        "sharedState": "Use a central dispatcher or messaging pattern to pass context if needed"
+      }
+    },
+    "notes": [
+      "MCP infrastructure is working. This file MUST NOT interfere with it.",
+      "Only use Figma Plugin API in plugins/figma-plugin-* directories.",
+      "Figma plugin logic will be modular and scoped, without conflicting with MCP or socket protocols.",
+      "Cursor is allowed to write plugin features in scoped folders, but not refactor or read from MCP paths."
+    ],
+    "resources": {
+      "documentation": [
+        "https://www.figma.com/plugin-docs/api/api-reference/",
+        "https://www.figma.com/plugin-docs/intro/",
+        "https://github.com/figma/plugin-samples"
+      ]
+    }
+  }
+  

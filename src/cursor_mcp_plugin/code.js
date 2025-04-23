@@ -176,6 +176,10 @@ async function handleCommand(command, params) {
       return await setLayoutSizing(params);
     case "set_item_spacing":
       return await setItemSpacing(params);
+    case "analyze_selection":
+      return await analyzeSelection();
+    case "convert_to_frame":
+      return await convertToFrame();
     default:
       throw new Error(`Unknown command: ${command}`);
   }
@@ -250,7 +254,9 @@ function rgbaToHex(color) {
 }
 
 function filterFigmaNode(node) {
+  console.log(`🔍 Filtering node: ${node.name} (${node.id})`);
   if (node.type === "VECTOR") {
+    console.log(`⏭️ Skipping VECTOR node: ${node.name}`);
     return null;
   }
 
@@ -258,7 +264,9 @@ function filterFigmaNode(node) {
     id: node.id,
     name: node.name,
     type: node.type,
+    visible: node.visible, // Add visible property
   };
+  console.log(`📝 Basic node info: ${JSON.stringify({ id: filtered.id, name: filtered.name, type: filtered.type, visible: filtered.visible })}`);
 
   if (node.fills && node.fills.length > 0) {
     filtered.fills = node.fills.map((fill) => {
@@ -323,15 +331,24 @@ function filterFigmaNode(node) {
   }
 
   if (node.children) {
+    console.log(`👶 Processing ${node.children.length} children of node ${node.name}`);
     filtered.children = node.children
       .map((child) => {
-        return filterFigmaNode(child);
+        const filteredChild = filterFigmaNode(child);
+        if (filteredChild) {
+          console.log(`✅ Processed child: ${child.name}, visible: ${filteredChild.visible}`);
+        }
+        return filteredChild;
       })
       .filter((child) => {
+        if (child === null) {
+          console.log(`⏭️ Filtered out null child`);
+        }
         return child !== null;
       });
   }
 
+  console.log(`✅ Completed filtering node: ${node.name}, visible: ${filtered.visible}`);
   return filtered;
 }
 
@@ -2961,4 +2978,130 @@ async function setItemSpacing(params) {
     itemSpacing: node.itemSpacing,
     layoutMode: node.layoutMode,
   };
+}
+
+async function analyzeSelection() {
+  console.log('🔍 Starting analyzeSelection');
+  const selection = figma.currentPage.selection;
+  
+  if (selection.length === 0) {
+    console.log('⚠️ No element selected');
+    return { error: 'No element selected' };
+  }
+
+  if (selection.length > 1) {
+    console.log('⚠️ Multiple elements selected');
+    return { error: 'Multiple elements selected. Please select only one element.' };
+  }
+
+  const node = selection[0];
+  console.log('✅ Selected node:', node.name, node.id);
+  
+  // Initialize statistics
+  let stats = {
+    totalLayers: 0,
+    hiddenLayers: 0,
+    lockedLayers: 0,
+    topLevelLayers: 0
+  };
+
+  // Function to recursively count layers
+  function countLayers(node) {
+    stats.totalLayers++;
+    console.log(`📊 Processing node: ${node.name} (${node.id}), visible: ${node.visible}`);
+    
+    if (!node.visible) {
+      stats.hiddenLayers++;
+      console.log(`🔍 Found hidden layer: ${node.name} (${node.id})`);
+    }
+    if (node.locked) {
+      stats.lockedLayers++;
+      console.log(`🔒 Found locked layer: ${node.name} (${node.id})`);
+    }
+
+    if ('children' in node) {
+      if (node.id === selection[0].id) {
+        stats.topLevelLayers = node.children.length;
+        console.log(`👶 Top level children count: ${node.children.length}`);
+      }
+      console.log(`📂 Processing ${node.children.length} children of node ${node.name}`);
+      node.children.forEach(child => countLayers(child));
+    }
+  }
+
+  // Count all layers
+  countLayers(node);
+  console.log('📈 Final statistics:', stats);
+
+  // Format the analysis as a simple string
+  let analysisText = [
+    `Selected Element: ${node.name}`,
+    `Total Layers: ${stats.totalLayers}`,
+    stats.hiddenLayers > 0 ? `Hidden Layers: ${stats.hiddenLayers}` : null,
+    stats.lockedLayers > 0 ? `Locked Layers: ${stats.lockedLayers}` : null,
+    stats.topLevelLayers > 0 ? `Direct Children: ${stats.topLevelLayers}` : null
+  ].filter(line => line !== null).join('\n');
+
+  const result = {
+    message: analysisText,
+    raw: filterFigmaNode(node),
+    statistics: stats
+  };
+  console.log('✅ Analysis complete:', result);
+  return result;
+}
+
+async function convertToFrame() {
+  console.log('🎯 Converting selection to frame...');
+  
+  // Get current selection
+  const selection = figma.currentPage.selection;
+  console.log(`📝 Current selection: ${selection.length} items`);
+  
+  if (selection.length === 0) {
+    throw new Error('Please select an element first');
+  }
+
+  const node = selection[0];
+  console.log('🔍 Selected node:', {
+    id: node.id,
+    type: node.type,
+    name: node.name,
+    width: node.width,
+    height: node.height
+  });
+
+  // Create new auto-layout frame
+  console.log('📦 Creating new auto-layout frame...');
+  const frame = figma.createFrame();
+  frame.name = 'Auto Layout Frame';
+  
+  // Make it square based on the larger dimension
+  const maxSize = Math.max(node.width, node.height);
+  console.log(`📏 Setting frame size to ${maxSize}x${maxSize}`);
+  frame.resize(maxSize, maxSize);
+  
+  // Set up auto-layout
+  console.log('⚙️ Configuring auto-layout properties...');
+  frame.layoutMode = 'VERTICAL';
+  frame.primaryAxisAlignItems = 'CENTER';
+  frame.counterAxisAlignItems = 'CENTER';
+  frame.layoutSizingHorizontal = 'FIXED';
+  frame.layoutSizingVertical = 'FIXED';
+  
+  // Position frame at original location
+  console.log('📍 Positioning frame at:', { x: node.x, y: node.y });
+  frame.x = node.x;
+  frame.y = node.y;
+  
+  // Move the selected node into the frame
+  console.log('➡️ Moving node into frame...');
+  frame.appendChild(node);
+  
+  // Select the new frame
+  console.log('✨ Selecting new frame...');
+  figma.currentPage.selection = [frame];
+  
+  console.log('✅ Frame conversion complete');
+  return frame;
 }

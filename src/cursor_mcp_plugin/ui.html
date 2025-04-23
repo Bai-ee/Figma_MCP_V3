@@ -180,31 +180,64 @@
       /* Log styles */
       .log-container {
         background-color: #2d2d2d;
-        border: 1px solid #444444;
-        border-radius: 6px;
-        height: 75px;
-        margin-bottom: 16px;
+        border: 1px solid #444;
+        border-radius: 4px;
+        padding: 12px;
+        height: 100px;
         overflow-y: auto;
-        padding: 8px;
-      }
-      .log-entry {
+        margin-bottom: 16px;
         font-family: monospace;
         font-size: 12px;
+      }
+      .log-entry {
         margin-bottom: 4px;
         color: #e0e0e0;
       }
-      .log-entry.success {
-        color: #4ade80;
-      }
-      .log-entry.error {
-        color: #ff9999;
-      }
-      .log-entry.info {
-        color: #66b3ff;
-      }
+      .log-entry.success { color: #4ade80; }
+      .log-entry.error { color: #ff9999; }
+      .log-entry.info { color: #66b3ff; }
       .log-entry .timestamp {
         color: #999999;
         margin-right: 8px;
+      }
+      .log-entry .structured-data {
+        display: block;
+        margin-top: 4px;
+        margin-left: 16px;
+        padding: 8px;
+        background-color: #2a2a2a;
+        border-radius: 4px;
+        border-left: 2px solid #444;
+      }
+      .log-entry .section-header {
+        color: #e6e6e6;
+        font-weight: bold;
+        margin-top: 4px;
+      }
+      .log-entry .section-content {
+        margin-left: 12px;
+        color: #cccccc;
+      }
+      .form-group {
+        margin-bottom: 16px;
+      }
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 12px;
+        color: #ccc;
+      }
+      input[type="number"] {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #444;
+        border-radius: 4px;
+        font-size: 14px;
+        background-color: #2d2d2d;
+        color: #e0e0e0;
+      }
+      .tile-container {
+        padding: 16px;
       }
     </style>
   </head>
@@ -226,6 +259,7 @@
       <div class="tabs">
         <div id="tab-connection" class="tab active">Connection</div>
         <div id="tab-tools" class="tab">Tools</div>
+        <div id="tab-tile" class="tab">Tile</div>
         <div id="tab-about" class="tab">About</div>
       </div>
 
@@ -309,6 +343,37 @@
               Export Selection
             </button>
           </div>
+        </div>
+      </div>
+
+      <div id="content-tile" class="tab-content">
+        <div class="tile-container">
+          <div class="log-container" id="tile-log" style="height: 75px;"></div>
+          <h2>Selection Tools</h2>
+          <button id="convertToFrame" class="button">Convert to Frame</button>
+          <div style="margin: 20px 0; border-bottom: 1px solid #444;"></div>
+          <h2>Tile Generator</h2>
+          <div class="form-group">
+            <label for="tileWidth">Tile Width (px):</label>
+            <input type="number" id="tileWidth" value="100" min="1">
+          </div>
+          <div class="form-group">
+            <label for="tileHeight">Tile Height (px):</label>
+            <input type="number" id="tileHeight" value="100" min="1">
+          </div>
+          <div class="form-group">
+            <label for="columns">Columns:</label>
+            <input type="number" id="columns" value="3" min="1">
+          </div>
+          <div class="form-group">
+            <label for="rows">Rows:</label>
+            <input type="number" id="rows" value="3" min="1">
+          </div>
+          <div class="form-group">
+            <label for="spacing">Spacing (px):</label>
+            <input type="number" id="spacing" value="10" min="0">
+          </div>
+          <button id="generateTiles" class="button">Generate Tiles</button>
         </div>
       </div>
 
@@ -755,9 +820,19 @@
       };
 
       // Log functionality
-      function addLogEntry(message, type = 'info') {
-        const logContainer = document.getElementById('tools-log');
+      function addLogEntry(message, type = 'info', target = 'tools-log') {
+        const logContainer = document.getElementById(target);
         if (!logContainer) return;
+
+        // Filter out debug messages and system info
+        if (typeof message === 'string') {
+          if (message.startsWith('[DEBUG]') || 
+              message.startsWith('[INFO]') || 
+              message.includes('socket') || 
+              message.includes('WebSocket')) {
+            return;
+          }
+        }
 
         const entry = document.createElement('div');
         entry.className = `log-entry ${type}`;
@@ -765,20 +840,76 @@
         const timestamp = document.createElement('span');
         timestamp.className = 'timestamp';
         timestamp.textContent = new Date().toLocaleTimeString();
-        
         entry.appendChild(timestamp);
-        entry.appendChild(document.createTextNode(message));
+
+        // Format the message based on type
+        if (typeof message === 'string') {
+          // Handle operation completed messages with JSON
+          if (message.includes('Operation completed successfully:')) {
+            try {
+              const jsonStr = message.split('Operation completed successfully:')[1].trim();
+              const data = JSON.parse(jsonStr);
+              
+              // Format analysis results
+              if (data.message && data.statistics) {
+                const lines = data.message.split('\n');
+                const stats = data.statistics;
+                
+                const summary = document.createElement('div');
+                summary.className = 'analysis-summary';
+                summary.innerHTML = `
+                  ${lines[0]}<br>
+                  Layers: ${stats.totalLayers} total, ${stats.hiddenLayers} hidden, ${stats.lockedLayers} locked
+                `.trim();
+                
+                entry.appendChild(summary);
+                return logContainer.appendChild(entry);
+              }
+            } catch (e) {
+              // If JSON parsing fails, show clean message
+              const cleanMessage = message
+                .replace('Operation completed successfully:', '')
+                .replace(/\{.*\}/g, '')
+                .trim();
+              entry.appendChild(document.createTextNode(cleanMessage));
+            }
+          } else {
+            // Clean up other messages
+            let cleanMessage = message
+              .replace(/\[.*?\]/g, '')
+              .replace(/\s+/g, ' ')
+              .trim();
+            entry.appendChild(document.createTextNode(cleanMessage));
+          }
+        } else if (typeof message === 'object') {
+          // Handle direct object messages
+          const summary = document.createElement('div');
+          summary.className = 'analysis-summary';
+          
+          if (message.type === 'RECTANGLE') {
+            summary.textContent = `Rectangle: ${message.width}x${message.height}`;
+          } else if (message.type === 'FRAME') {
+            summary.textContent = `Frame: ${message.name} (${message.width}x${message.height})`;
+          } else if (message.type === 'TEXT') {
+            summary.textContent = `Text: "${message.characters?.substring(0, 30)}${message.characters?.length > 30 ? '...' : ''}"`;
+          } else if (message.statistics) {
+            summary.textContent = `Analysis: ${message.statistics.totalLayers} layers (${message.statistics.hiddenLayers} hidden, ${message.statistics.lockedLayers} locked)`;
+          } else {
+            summary.textContent = message.summary || 'Analysis complete';
+          }
+          
+          entry.appendChild(summary);
+        }
         
         logContainer.appendChild(entry);
         
-        // Ensure the new entry is scrolled into view
-        requestAnimationFrame(() => {
-          entry.scrollIntoView({ behavior: 'smooth', block: 'end' });
-          // Double-check scroll position after a small delay to ensure content is rendered
-          setTimeout(() => {
-            logContainer.scrollTop = logContainer.scrollHeight;
-          }, 100);
-        });
+        // Keep only the last 50 entries
+        while (logContainer.children.length > 50) {
+          logContainer.removeChild(logContainer.firstChild);
+        }
+        
+        // Scroll to the latest entry
+        entry.scrollIntoView({ behavior: 'smooth', block: 'end' });
       }
 
       document.addEventListener('DOMContentLoaded', () => {
@@ -896,46 +1027,48 @@
 
         // Analyze section buttons
         const analyzeLayers = document.getElementById('analyze-layers');
+        const deleteLayersBtn = document.getElementById('delete-layers');
+        let hiddenLayerIds = []; // Store hidden layer IDs
+
         if (analyzeLayers) {
           analyzeLayers.onclick = async () => {
-            addLogEntry('Starting layer analysis...', 'info');
+            console.log('🔍 Analyze button clicked');
+            addLogEntry('Analyzing selected element...', 'info');
+            hiddenLayerIds = []; // Reset hidden layer IDs
+            console.log('🔄 Reset hiddenLayerIds:', hiddenLayerIds);
+            deleteLayersBtn.disabled = true; // Reset delete button state
+            console.log('🔒 Delete button disabled');
             
-            // First get the current document info
             parent.postMessage({ 
               pluginMessage: { 
                 type: 'execute-command',
-                command: 'get_document_info',
-                params: {}
+                command: 'analyze_selection'
               }
             }, '*');
+            console.log('📤 Sent analyze_selection command');
+          };
+        }
 
-            // Update the message handler to handle document info response
-            const originalMessageHandler = window.onmessage;
-            window.onmessage = (event) => {
-              const message = event.data.pluginMessage;
-              if (!message) return;
-
-              if (message.type === 'command-result' && message.result && message.result.id) {
-                // Got document info, now scan nodes using the document ID
-                addLogEntry('Got document info, scanning layers...', 'info');
-                parent.postMessage({ 
-                  pluginMessage: { 
-                    type: 'execute-command',
-                    command: 'scan_nodes_by_types',
-                    params: {
-                      nodeId: message.result.id,
-                      types: ['FRAME', 'GROUP', 'COMPONENT', 'INSTANCE']
-                    }
+        if (deleteLayersBtn) {
+          deleteLayersBtn.onclick = async () => {
+            console.log('🗑️ Delete button clicked');
+            console.log('📊 Current hidden layer IDs:', hiddenLayerIds);
+            
+            if (hiddenLayerIds.length > 0) {
+              addLogEntry(`Deleting ${hiddenLayerIds.length} hidden layers...`, 'info');
+              console.log(`🗑️ Attempting to delete ${hiddenLayerIds.length} hidden layers`);
+              parent.postMessage({
+                pluginMessage: {
+                  type: 'execute-command',
+                  command: 'delete_multiple_nodes',
+                  params: {
+                    nodeIds: hiddenLayerIds
                   }
-                }, '*');
-                
-                // Restore original message handler
-                window.onmessage = originalMessageHandler;
-              } else {
-                // Pass through to original handler
-                originalMessageHandler(event);
-              }
-            };
+                }
+              }, '*');
+            } else {
+              console.log('⚠️ No hidden layers to delete');
+            }
           };
         }
 
@@ -944,20 +1077,184 @@
           const message = event.data.pluginMessage;
           if (!message) return;
 
+          console.log('📨 Received message from plugin:', message);
+
           switch (message.type) {
             case 'command-result':
+              if (message.command === 'analyze_selection' && message.result) {
+                console.log('📊 Analyze selection result:', message.result);
+                const result = message.result;
+                
+                if (result.raw && result.statistics) {
+                  console.log('📈 Statistics:', result.statistics);
+                  console.log('🌳 Raw node data:', result.raw);
+                  
+                  if (result.statistics.hiddenLayers > 0) {
+                    console.log(`🔍 Found ${result.statistics.hiddenLayers} hidden layers`);
+                    // Enable delete button if hidden layers are found
+                    deleteLayersBtn.disabled = false;
+                    console.log('🔓 Delete button enabled');
+                    
+                    // Collect hidden layer IDs recursively
+                    function collectHiddenLayerIds(node) {
+                      if (!node) {
+                        console.log('⚠️ Node is null in collectHiddenLayerIds');
+                        return;
+                      }
+                      
+                      if (node.visible === false) {
+                        console.log('🎯 Found hidden node:', node.id);
+                        hiddenLayerIds.push(node.id);
+                      }
+                      
+                      if (node.children) {
+                        console.log(`👶 Processing ${node.children.length} children of node ${node.id}`);
+                        node.children.forEach(child => collectHiddenLayerIds(child));
+                      }
+                    }
+                    
+                    hiddenLayerIds = []; // Reset before collecting
+                    console.log('🔄 Reset hiddenLayerIds before collection');
+                    collectHiddenLayerIds(result.raw);
+                    console.log('✅ Collected hidden layer IDs:', hiddenLayerIds);
+                  } else {
+                    console.log('ℹ️ No hidden layers found');
+                    deleteLayersBtn.disabled = true;
+                    hiddenLayerIds = [];
+                  }
+                } else {
+                  console.log('⚠️ Invalid result format:', result);
+                }
+              }
               addLogEntry(`Operation completed successfully: ${JSON.stringify(message.result)}`, 'success');
               break;
             case 'command-error':
+              console.log('❌ Command error:', message.error);
               addLogEntry(`Error: ${message.error}`, 'error');
               break;
             case 'command_progress':
+              console.log('📈 Command progress:', message);
               if (message.status === 'started') {
                 addLogEntry(`Operation started: ${message.message}`, 'info');
               } else if (message.status === 'completed') {
                 addLogEntry(`Operation completed: ${message.message}`, 'success');
               } else if (message.status === 'error') {
                 addLogEntry(`Operation failed: ${message.message}`, 'error');
+              }
+              break;
+          }
+        });
+
+        // Add convert to frame functionality
+        document.getElementById('convertToFrame')?.addEventListener('click', () => {
+          console.log('🔄 Convert to Frame button clicked');
+          addLogEntry('Converting selection to frame...', 'info', 'tile-log');
+          console.log('📤 Sending convert_to_frame command...');
+          
+          parent.postMessage({ 
+            pluginMessage: { 
+              type: 'execute-command',
+              command: 'convert_to_frame'
+            }
+          }, '*');
+          console.log('📨 Command sent to plugin');
+        });
+
+        // Add tile generation functionality
+        document.getElementById('generateTiles')?.addEventListener('click', () => {
+          const tileWidth = parseInt(document.getElementById('tileWidth').value);
+          const tileHeight = parseInt(document.getElementById('tileHeight').value);
+          const columns = parseInt(document.getElementById('columns').value);
+          const rows = parseInt(document.getElementById('rows').value);
+          const spacing = parseInt(document.getElementById('spacing').value);
+
+          addLogEntry('Generating tiles...', 'info', 'tile-log');
+          parent.postMessage({
+            pluginMessage: {
+              type: 'generate-tiles',
+              tileWidth,
+              tileHeight,
+              columns,
+              rows,
+              spacing
+            }
+          }, '*');
+        });
+
+        // Update the message handler to handle tile-specific messages
+        window.addEventListener('message', (event) => {
+          const message = event.data.pluginMessage;
+          if (!message) return;
+
+          // Determine which log container to use based on the active tab
+          const activeTab = document.querySelector('.tab.active');
+          const logTarget = activeTab?.id === 'tab-tile' ? 'tile-log' : 'tools-log';
+
+          switch (message.type) {
+            case 'command-result':
+              if (message.command === 'get_selection') {
+                const result = message.result;
+                if (!result || result.selectionCount === 0 || !result.selection || result.selection.length === 0) {
+                  addLogEntry('No selection found', 'error', logTarget);
+                  return;
+                }
+
+                // Get more details about the selected node
+                parent.postMessage({
+                  pluginMessage: {
+                    type: 'execute-command',
+                    command: 'get_node_info',
+                    params: {
+                      nodeId: result.selection[0]
+                    }
+                  }
+                }, '*');
+              } else if (message.command === 'get_node_info') {
+                const node = message.result;
+                addLogEntry(`Selected ${node.type.toLowerCase()}: ${node.width}x${node.height}`, 'info', logTarget);
+
+                // Calculate the square size (max of width or height)
+                const maxSize = Math.max(node.width, node.height);
+                const originalX = node.x;
+                const originalY = node.y;
+
+                // Create new frame with auto layout
+                parent.postMessage({
+                  pluginMessage: {
+                    type: 'execute-command',
+                    command: 'create_frame',
+                    params: {
+                      x: originalX,
+                      y: originalY,
+                      width: maxSize,
+                      height: maxSize,
+                      name: 'Auto Layout Frame',
+                      layoutMode: 'VERTICAL',
+                      primaryAxisAlignItems: 'CENTER',
+                      counterAxisAlignItems: 'CENTER',
+                      layoutSizingHorizontal: 'FIXED',
+                      layoutSizingVertical: 'FIXED',
+                      selection: node.id
+                    }
+                  }
+                }, '*');
+              } else if (message.result && message.result.name === 'Auto Layout Frame') {
+                const frame = message.result;
+                addLogEntry(`Created auto-layout frame: ${frame.width}x${frame.height}`, 'success', logTarget);
+              }
+              break;
+            case 'tiles-created':
+              if (message.success) {
+                addLogEntry('Tiles generated successfully!', 'success', logTarget);
+              } else {
+                addLogEntry(`Error generating tiles: ${message.error}`, 'error', logTarget);
+              }
+              break;
+            case 'frame-converted':
+              if (message.success) {
+                addLogEntry('Converted to auto-layout frame successfully!', 'success', logTarget);
+              } else {
+                addLogEntry(`Error converting to frame: ${message.error}`, 'error', logTarget);
               }
               break;
           }
