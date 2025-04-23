@@ -239,6 +239,173 @@
       .tile-container {
         padding: 16px;
       }
+      .chat-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      
+      .api-key-section {
+        margin-bottom: 16px;
+        padding: 16px;
+        background-color: #2d2d2d;
+        border-radius: 8px;
+      }
+      
+      .chat-messages {
+        flex-grow: 1;
+        overflow-y: auto;
+        margin-bottom: 16px;
+        padding: 16px;
+        background-color: #2d2d2d;
+        border-radius: 8px;
+        min-height: 200px;
+      }
+      
+      .message {
+        margin-bottom: 16px;
+        padding: 8px 12px;
+        border-radius: 8px;
+      }
+      
+      .user-message {
+        background-color: #1a3147;
+        margin-left: 20px;
+      }
+      
+      .assistant-message {
+        background-color: #1a472a;
+        margin-right: 20px;
+      }
+      
+      .chat-input {
+        display: flex;
+        gap: 8px;
+      }
+      
+      .chat-input textarea {
+        flex-grow: 1;
+        padding: 8px;
+        border: 1px solid #444;
+        border-radius: 4px;
+        background-color: #2d2d2d;
+        color: #e0e0e0;
+        resize: none;
+        min-height: 40px;
+        font-family: inherit;
+      }
+      
+      .chat-input button {
+        padding: 8px 16px;
+        background-color: #18a0fb;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      
+      .chat-input button:disabled {
+        background-color: #666;
+        cursor: not-allowed;
+      }
+      
+      .api-key-input {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 8px;
+        border: 1px solid #444;
+        border-radius: 4px;
+        background-color: #2d2d2d;
+        color: #e0e0e0;
+      }
+
+      /* Chat styles */
+      .chat-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
+        background-color: #2d2d2d;
+        border: 1px solid #444;
+        border-radius: 4px;
+        margin-bottom: 16px;
+      }
+      .chat-input {
+        display: flex;
+        gap: 8px;
+      }
+      .chat-input textarea {
+        flex: 1;
+        min-height: 60px;
+        resize: vertical;
+        padding: 8px;
+        border: 1px solid #444;
+        border-radius: 4px;
+        background-color: #2d2d2d;
+        color: #e0e0e0;
+        font-family: inherit;
+      }
+      .chat-input button {
+        align-self: flex-end;
+      }
+      .message {
+        margin-bottom: 12px;
+        padding: 8px 12px;
+        border-radius: 4px;
+        max-width: 80%;
+      }
+      .user-message {
+        background-color: #18a0fb33;
+        margin-left: auto;
+      }
+      .assistant-message {
+        background-color: #3d3d3d;
+      }
+      .api-key-section {
+        background-color: #2d2d2d;
+        border: 1px solid #444;
+        border-radius: 4px;
+        padding: 12px;
+        margin-bottom: 16px;
+      }
+      .api-key-section.hidden {
+        display: none;
+      }
+      .api-key-input {
+        position: relative;
+      }
+      .api-key-input input {
+        padding-right: 40px;
+      }
+      .toggle-visibility {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #999;
+        cursor: pointer;
+        padding: 4px;
+        margin: 0;
+      }
+      .toggle-visibility:hover {
+        color: #fff;
+      }
+      .api-key-status {
+        font-size: 12px;
+        margin-top: 4px;
+      }
+      .api-key-status.valid {
+        color: #4ade80;
+      }
+      .api-key-status.invalid {
+        color: #ff9999;
+      }
     </style>
   </head>
   <body>
@@ -259,8 +426,8 @@
       <div class="tabs">
         <div id="tab-connection" class="tab active">MCP</div>
         <div id="tab-tools" class="tab">Tools</div>
-        <div id="tab-tile" class="tab">Tile</div>
-        <div id="tab-about" class="tab">About</div>
+        <div id="tab-tile" class="tab"> Map & Sprites</div>
+        <div id="tab-about" class="tab">Chat</div>
       </div>
 
       <div id="content-connection" class="tab-content active">
@@ -350,7 +517,7 @@
         <div class="tile-container">
           <div class="log-container" id="tile-log" style="height: 75px;"></div>
           
-          <h2>Tile Map</h2>
+          <h2>Creaate Tile Map</h2>
           <div class="form-group">
             <label for="frameWidth">Frame Width (px):</label>
             <input type="number" id="frameWidth" value="1200" min="1">
@@ -427,26 +594,249 @@
       </div>
 
       <div id="content-about" class="tab-content">
-        <div class="section">
-          <h2>About Bai-ee's Talk To Figma Plugin</h2>
-          <p>
-            This plugin allows Cursor AI to communicate with Figma, enabling
-            AI-assisted design operations. created by
-            <a
-              class="link"
-              onclick="window.open(`https://github.com/sonnylazuardi`, '_blank')"
-              >Sonny</a
-            >
-          </p>
-          <p>Version: 1.0.0</p>
+        <style>
+          .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+          }
+          
+          .api-key-section {
+            margin-bottom: 16px;
+            padding: 16px;
+            background-color: #2d2d2d;
+            border-radius: 8px;
+          }
+          
+          .chat-messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-bottom: 16px;
+            padding: 16px;
+            background-color: #2d2d2d;
+            border-radius: 8px;
+            min-height: 200px;
+          }
+          
+          .message {
+            margin-bottom: 16px;
+            padding: 8px 12px;
+            border-radius: 8px;
+          }
+          
+          .user-message {
+            background-color: #1a3147;
+            margin-left: 20px;
+          }
+          
+          .assistant-message {
+            background-color: #1a472a;
+            margin-right: 20px;
+          }
+          
+          .chat-input {
+            display: flex;
+            gap: 8px;
+          }
+          
+          .chat-input textarea {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background-color: #2d2d2d;
+            color: #e0e0e0;
+            resize: none;
+            min-height: 40px;
+            font-family: inherit;
+          }
+          
+          .chat-input button {
+            padding: 8px 16px;
+            background-color: #18a0fb;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+          }
+          
+          .chat-input button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+          }
+          
+          .api-key-input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 8px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background-color: #2d2d2d;
+            color: #e0e0e0;
+          }
+        </style>
 
-          <h2>How to Use</h2>
-          <ol>
-            <li>Make sure the MCP server is running in Cursor</li>
-            <li>Connect to the server using the port number (default: 3055)</li>
-            <li>Once connected, you can interact with Figma through Cursor</li>
-          </ol>
+        <div class="chat-container">
+          <div class="api-key-section" id="api-key-section">
+            <h2>OpenAI API Key</h2>
+            <div class="api-key-input">
+              <input 
+                type="password" 
+                id="openai-key" 
+                placeholder="Enter your OpenAI API key"
+              />
+              <button class="toggle-visibility" id="toggle-key-visibility">👁️</button>
+            </div>
+            <div class="api-key-status" id="api-key-status"></div>
+            <button id="save-api-key">Save API Key</button>
+          </div>
+
+          <div class="chat-messages" id="chat-messages">
+            <div class="message assistant-message">
+              Hello! I'm your Figma design assistant. How can I help you today?
+            </div>
+          </div>
+
+          <div class="chat-input">
+            <textarea 
+              id="chat-input" 
+              placeholder="Type your message here..." 
+              rows="2"
+            ></textarea>
+            <button id="send-message" disabled>Send</button>
+          </div>
         </div>
+
+        <script>
+          // Chat functionality
+          const apiKeyInput = document.getElementById('openai-key');
+          const saveApiKeyButton = document.getElementById('save-api-key');
+          const chatInput = document.getElementById('chat-input');
+          const sendMessageButton = document.getElementById('send-message');
+          const chatMessages = document.getElementById('chat-messages');
+          const apiKeySection = document.getElementById('api-key-section');
+          const apiKeyStatus = document.getElementById('api-key-status');
+          const toggleKeyVisibility = document.getElementById('toggle-key-visibility');
+          
+          // Toggle API key visibility
+          toggleKeyVisibility.addEventListener('click', () => {
+            const type = apiKeyInput.type;
+            apiKeyInput.type = type === 'password' ? 'text' : 'password';
+            toggleKeyVisibility.textContent = type === 'password' ? '👁️‍🗨️' : '👁️';
+          });
+
+          // Validate API key format
+          function validateApiKey(key) {
+            // Support both OpenAI (sk-...) and Anthropic (sk-proj-...) formats
+            return /^sk-(?:proj-)?[A-Za-z0-9-_]{32,}$/.test(key.trim());
+          }
+
+          // Update API key status
+          function updateApiKeyStatus(key) {
+            if (!key) {
+              apiKeyStatus.textContent = 'Please enter your API key';
+              apiKeyStatus.className = 'api-key-status';
+              return false;
+            }
+            
+            const isValid = validateApiKey(key);
+            apiKeyStatus.textContent = isValid 
+              ? 'Valid API key format' 
+              : 'Invalid API key format. It should start with "sk-" or "sk-proj-" followed by at least 32 characters';
+            apiKeyStatus.className = `api-key-status ${isValid ? 'valid' : 'invalid'}`;
+            return isValid;
+          }
+          
+          // Load saved API key
+          (async function loadApiKey() {
+            try {
+              parent.postMessage({ 
+                pluginMessage: { 
+                  type: 'get-api-key'
+                }
+              }, '*');
+            } catch (error) {
+              console.error('Error loading API key:', error);
+            }
+          })();
+          
+          // Save API key
+          saveApiKeyButton.addEventListener('click', () => {
+            const apiKey = apiKeyInput.value.trim();
+            if (updateApiKeyStatus(apiKey)) {
+              parent.postMessage({ 
+                pluginMessage: { 
+                  type: 'save-api-key',
+                  key: apiKey
+                }
+              }, '*');
+              sendMessageButton.disabled = false;
+              addMessage('API key saved successfully! You can now start chatting.', 'assistant');
+            }
+          });
+
+          // Input validation
+          apiKeyInput.addEventListener('input', () => {
+            updateApiKeyStatus(apiKeyInput.value);
+          });
+          
+          // Handle message sending
+          function sendMessage() {
+            const message = chatInput.value.trim();
+            if (!message) return;
+            
+            // Add user message to chat
+            addMessage(message, 'user');
+            chatInput.value = '';
+            
+            // Send to OpenAI
+            parent.postMessage({ 
+              pluginMessage: { 
+                type: 'chat-message',
+                message: message
+              }
+            }, '*');
+            
+            // Disable input while waiting for response
+            chatInput.disabled = true;
+            sendMessageButton.disabled = true;
+          }
+          
+          // Send message on button click or Enter (Shift+Enter for new line)
+          sendMessageButton.addEventListener('click', sendMessage);
+          chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              sendMessage();
+            }
+          });
+          
+          // Add message to chat
+          function addMessage(text, role) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}-message`;
+            messageDiv.textContent = text;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+          }
+          
+          // Listen for responses
+          window.addEventListener('message', (event) => {
+            const message = event.data.pluginMessage;
+            
+            if (message.type === 'api-key') {
+              if (message.key) {
+                apiKeyInput.value = message.key;
+                updateApiKeyStatus(message.key);
+                sendMessageButton.disabled = false;
+              }
+            } else if (message.type === 'chat-response') {
+              addMessage(message.response, 'assistant');
+              chatInput.disabled = false;
+              sendMessageButton.disabled = false;
+            }
+          });
+        </script>
       </div>
     </div>
 

@@ -52,9 +52,111 @@ function sendProgressUpdate(
 // Show UI
 figma.showUI(__html__, { width: 350, height: 450 });
 
-// Plugin commands from UI
+// OpenAI configuration
+const openAIConfig = {
+  apiKey: null,
+  endpoint: 'https://api.openai.com/v1/chat/completions'
+};
+
+async function callOpenAI(message) {
+  try {
+    if (!openAIConfig.apiKey) {
+      throw new Error('OpenAI API key not set. Please add your API key in the settings.');
+    }
+
+    console.log('Calling OpenAI API...');
+    const response = await fetch(openAIConfig.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openAIConfig.apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful Figma design assistant. You can provide guidance on design principles, help with Figma features, and offer suggestions for improving designs.'
+          },
+          {
+            role: 'user',
+            content: message
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(
+        `OpenAI API error: ${response.status} ${response.statusText}${
+          errorData ? '\n' + JSON.stringify(errorData.error, null, 2) : ''
+        }`
+      );
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error('OpenAI API error:', error);
+    throw new Error(`OpenAI API error: ${error.message}`);
+  }
+}
+
+// Handle messages from the UI
 figma.ui.onmessage = async (msg) => {
+  console.log('Received message:', msg);
+
   switch (msg.type) {
+    case 'save-api-key':
+      try {
+        openAIConfig.apiKey = msg.key;
+        await figma.clientStorage.setAsync('openai-api-key', msg.key);
+        figma.ui.postMessage({ 
+          type: 'chat-response',
+          response: 'API key saved successfully! You can now start chatting.'
+        });
+      } catch (error) {
+        console.error('Error saving API key:', error);
+        figma.ui.postMessage({ 
+          type: 'chat-response',
+          response: 'Error saving API key. Please try again.'
+        });
+      }
+      break;
+
+    case 'get-api-key':
+      try {
+        const savedKey = await figma.clientStorage.getAsync('openai-api-key');
+        if (savedKey) {
+          openAIConfig.apiKey = savedKey;
+          figma.ui.postMessage({ type: 'api-key', key: savedKey });
+        }
+      } catch (error) {
+        console.error('Error loading API key:', error);
+      }
+      break;
+
+    case 'chat-message':
+      try {
+        console.log('Processing chat message...');
+        const response = await callOpenAI(msg.message);
+        console.log('Received OpenAI response');
+        figma.ui.postMessage({ 
+          type: 'chat-response',
+          response: response
+        });
+      } catch (error) {
+        console.error('Chat error:', error);
+        figma.ui.postMessage({ 
+          type: 'chat-response',
+          response: `Error: ${error.message}`
+        });
+      }
+      break;
+
     case "update-settings":
       updateSettings(msg);
       break;
@@ -3277,15 +3379,107 @@ async function exportPhaserMap(params) {
       }
     }
 
-    // Create a text node with the JSON data
+    // Create the terminal-style frame
+    const terminalFrame = figma.createFrame();
+    terminalFrame.name = `${mapName}.json`;
+    
+    // Position in the center of the viewport
+    const { x, y } = figma.viewport.center;
+    
+    // Set frame properties for terminal look
+    terminalFrame.layoutMode = 'VERTICAL';
+    terminalFrame.primaryAxisSizingMode = 'AUTO';
+    terminalFrame.counterAxisSizingMode = 'AUTO';
+    terminalFrame.fills = [{ type: 'SOLID', color: { r: 0.133, g: 0.133, b: 0.133 } }]; // Dark gray background
+    terminalFrame.paddingLeft = 24;
+    terminalFrame.paddingRight = 24;
+    terminalFrame.paddingTop = 24;
+    terminalFrame.paddingBottom = 24;
+    terminalFrame.cornerRadius = 12;
+    
+    // Add terminal header
+    const headerFrame = figma.createFrame();
+    headerFrame.name = 'Terminal Header';
+    headerFrame.layoutMode = 'HORIZONTAL';
+    headerFrame.primaryAxisSizingMode = 'FIXED';  // Changed from FILL to FIXED
+    headerFrame.counterAxisSizingMode = 'AUTO';
+    headerFrame.fills = [{ type: 'SOLID', color: { r: 0.2, g: 0.2, b: 0.2 } }]; // Slightly lighter gray
+    headerFrame.paddingLeft = 12;
+    headerFrame.paddingRight = 12;
+    headerFrame.paddingTop = 8;
+    headerFrame.paddingBottom = 8;
+    headerFrame.cornerRadius = 8;
+    headerFrame.resize(400, headerFrame.height); // Set a fixed width for the header
+    
+    // Create header text and load fonts first
+    const headerText = figma.createText();
     const textNode = figma.createText();
-    textNode.name = `${mapName}.json`;
-    textNode.x = frame.x + frame.width + 20;
-    textNode.y = frame.y;
 
-    // Load the default font before setting text content
-    await figma.loadFontAsync({ family: "Inter", style: "Regular" });
-    textNode.characters = JSON.stringify(tilemapData, null, 2);
+    // Load all required fonts first
+    console.log('Loading fonts...');
+    await Promise.all([
+      figma.loadFontAsync({ family: "Inter", style: "Medium" }),
+      figma.loadFontAsync({ family: "Inter", style: "Regular" })
+    ]);
+
+    // Try to load additional monospace fonts
+    let monospaceFontLoaded = false;
+    try {
+      await figma.loadFontAsync({ family: "JetBrains Mono", style: "Regular" });
+      textNode.fontName = { family: "JetBrains Mono", style: "Regular" };
+      monospaceFontLoaded = true;
+    } catch (e1) {
+      try {
+        await figma.loadFontAsync({ family: "Consolas", style: "Regular" });
+        textNode.fontName = { family: "Consolas", style: "Regular" };
+        monospaceFontLoaded = true;
+      } catch (e2) {
+        console.log('Falling back to Inter font');
+        textNode.fontName = { family: "Inter", style: "Regular" };
+      }
+    }
+
+    // Now set up the header
+    headerText.fontName = { family: "Inter", style: "Medium" };
+    headerText.characters = `${mapName}.json`;
+    headerText.fills = [{ type: 'SOLID', color: { r: 0.8, g: 0.8, b: 0.8 } }]; // Light gray text
+    
+    // Add header elements
+    headerFrame.appendChild(headerText);
+    terminalFrame.appendChild(headerFrame);
+
+    // Add the main text content
+    terminalFrame.appendChild(textNode);
+    
+    // Format JSON with proper indentation and add command prompt style
+    const formattedJson = JSON.stringify(tilemapData, null, 2);
+    textNode.characters = `$ cat ${mapName}.json\n${formattedJson}`;
+    
+    // Style the text
+    textNode.fontSize = 12;
+    textNode.fills = [{ type: 'SOLID', color: { r: 0.8, g: 0.8, b: 0.8 } }]; // Light gray text
+    textNode.lineHeight = { value: 150, unit: 'PERCENT' }; // Increase line height for better readability
+
+    // Add drop shadow to terminal window
+    terminalFrame.effects = [
+      {
+        type: 'DROP_SHADOW',
+        color: { r: 0, g: 0, b: 0, a: 0.3 },
+        offset: { x: 0, y: 4 },
+        radius: 16,
+        spread: 0,
+        visible: true,
+        blendMode: 'NORMAL'
+      }
+    ];
+
+    // Position the frame in the center of the viewport
+    terminalFrame.x = x - (terminalFrame.width / 2);
+    terminalFrame.y = y - (terminalFrame.height / 2);
+
+    // Select the frame and zoom to it
+    figma.currentPage.selection = [terminalFrame];
+    figma.viewport.scrollAndZoomIntoView([terminalFrame]);
 
     console.log('✅ Tilemap exported successfully');
     figma.notify('Tilemap exported successfully');
