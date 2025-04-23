@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Cursor Figma Features</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #1e1e1e;
+      color: #e0e0e0;
+    }
+
+    #app {
+      width: 100%;
+      max-width: 300px;
+      margin: 0 auto;
+    }
+
+    #tabs {
+      display: flex;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #444;
+    }
+
+    .tab {
+      padding: 8px 16px;
+      cursor: pointer;
+      border: none;
+      background: none;
+      font-size: 14px;
+      color: #999;
+    }
+
+    .tab.active {
+      border-bottom: 2px solid #18a0fb;
+      color: #18a0fb;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: #ccc;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #444;
+      border-radius: 4px;
+      font-size: 14px;
+      background-color: #2d2d2d;
+      color: #e0e0e0;
+    }
+
+    button {
+      width: 100%;
+      padding: 8px 16px;
+      background-color: #18a0fb;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    button:hover {
+      background-color: #0d8ee0;
+    }
+
+    .tile-container {
+      padding: 16px;
+    }
+
+    h2 {
+      margin: 0 0 16px 0;
+      font-size: 16px;
+      color: #fff;
+    }
+
+    .log-container {
+      background-color: #2d2d2d;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 12px;
+      height: 100px;
+      overflow-y: auto;
+      margin-bottom: 16px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+
+    .log-entry {
+      margin-bottom: 4px;
+      color: #e0e0e0;
+    }
+
+    .log-entry.success { color: #4ade80; }
+    .log-entry.error { color: #ff9999; }
+    .log-entry.info { color: #66b3ff; }
+
+    .debug-panel {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #2d2d2d;
+      border-top: 1px solid #444;
+      padding: 8px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #4ade80;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="tabs">
+      <button class="tab active" data-tab="tile">Tile</button>
+    </div>
+    <div id="content">
+      <div class="tile-container">
+        <div class="log-container" id="tile-log"></div>
+        
+        <h2>Selection Tools</h2>
+        <button id="convertToFrame" onclick="logClick(this)">Convert Selection to Frame</button>
+        
+        <div style="margin: 20px 0; border-bottom: 1px solid #444;"></div>
+        
+        <h2>Tile Generator</h2>
+        <div class="form-group">
+          <label for="tileWidth">Tile Width (px):</label>
+          <input type="number" id="tileWidth" value="100" min="1">
+        </div>
+        <div class="form-group">
+          <label for="tileHeight">Tile Height (px):</label>
+          <input type="number" id="tileHeight" value="100" min="1">
+        </div>
+        <div class="form-group">
+          <label for="columns">Columns:</label>
+          <input type="number" id="columns" value="3" min="1">
+        </div>
+        <div class="form-group">
+          <label for="rows">Rows:</label>
+          <input type="number" id="rows" value="3" min="1">
+        </div>
+        <div class="form-group">
+          <label for="spacing">Spacing (px):</label>
+          <input type="number" id="spacing" value="10" min="0">
+        </div>
+        <button id="generateTiles" onclick="logClick(this)">Generate Tiles</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="debug-panel" id="debug-panel">
+    Initializing...
+  </div>
+
+  <script>
+    console.log('🔵 UI Script starting...');
+    
+    // Debug logging helper
+    function updateDebugPanel(message) {
+      const panel = document.getElementById('debug-panel');
+      const timestamp = new Date().toLocaleTimeString();
+      panel.textContent = `[${timestamp}] ${message}`;
+    }
+
+    // Click logging helper
+    function logClick(button) {
+      console.log(`🖱️ Button clicked: ${button.id}`);
+      updateDebugPanel(`Button clicked: ${button.id}`);
+    }
+
+    // Utility function to add log entries
+    function addLogEntry(message, type = 'info') {
+      console.log(`📝 Log Entry (${type}):`, message);
+      const logContainer = document.getElementById('tile-log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = message;
+      logContainer.appendChild(entry);
+      logContainer.scrollTop = logContainer.scrollHeight;
+      updateDebugPanel(`Added log: ${message}`);
+    }
+
+    // Utility function to generate unique IDs
+    function generateId() {
+      const id = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+      console.log('🆔 Generated ID:', id);
+      return id;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('🟢 UI DOM loaded');
+      updateDebugPanel('UI Ready - Waiting for plugin connection...');
+      addLogEntry('UI Initialized', 'info');
+      
+      // Convert to Frame button
+      document.getElementById('convertToFrame').addEventListener('click', () => {
+        console.log('🔄 Convert to Frame button clicked');
+        updateDebugPanel('Converting selection to frame...');
+        const commandId = generateId();
+        addLogEntry('Converting selection to frame...', 'info');
+        
+        // First, get the current selection
+        console.log('📤 Sending get_selection command...');
+        parent.postMessage({
+          pluginMessage: {
+            type: 'execute-command',
+            command: 'get_selection',
+            id: commandId
+          }
+        }, '*');
+      });
+
+      // Generate Tiles button
+      document.getElementById('generateTiles').addEventListener('click', () => {
+        console.log('🎨 Generate Tiles button clicked');
+        updateDebugPanel('Generating tiles...');
+        const commandId = generateId();
+        const tileWidth = parseInt(document.getElementById('tileWidth').value);
+        const tileHeight = parseInt(document.getElementById('tileHeight').value);
+        const columns = parseInt(document.getElementById('columns').value);
+        const rows = parseInt(document.getElementById('rows').value);
+        const spacing = parseInt(document.getElementById('spacing').value);
+
+        addLogEntry('Generating tiles...', 'info');
+        parent.postMessage({
+          pluginMessage: {
+            type: 'generate-tiles',
+            id: commandId,
+            tileWidth,
+            tileHeight,
+            columns,
+            rows,
+            spacing
+          }
+        }, '*');
+      });
+
+      // Handle messages from the plugin
+      window.onmessage = (event) => {
+        const msg = event.data.pluginMessage;
+        if (!msg) return;
+        
+        console.log('📨 Received message:', msg);
+        updateDebugPanel(`Received: ${msg.type}`);
+        
+        switch (msg.type) {
+          case 'test':
+            console.log('🎯 Test message received:', msg.message);
+            updateDebugPanel('Plugin connected! ✅');
+            addLogEntry('Plugin connected successfully', 'success');
+            break;
+          case 'command-result':
+            console.log('✅ Command result:', msg);
+            if (msg.command === 'get_selection') {
+              const selection = msg.result;
+              if (selection && selection.selectionCount > 0) {
+                console.log(`🎯 Found ${selection.selectionCount} selected items`);
+                updateDebugPanel(`Selection found: ${selection.selectionCount} items`);
+                // Now convert the selection to frame
+                const commandId = generateId();
+                parent.postMessage({
+                  pluginMessage: {
+                    type: 'convert-to-frame',
+                    id: commandId
+                  }
+                }, '*');
+              } else {
+                console.log('⚠️ No selection found');
+                updateDebugPanel('No selection found');
+                addLogEntry('Please select an element first', 'error');
+              }
+            }
+            break;
+          case 'selection-updated':
+            console.log(`🔄 Selection updated: ${msg.selection.length} items`);
+            updateDebugPanel(`Selection changed: ${msg.selection.length} items`);
+            addLogEntry(`Selection updated: ${msg.selection.length} items selected`, 'info');
+            break;
+          case 'tiles-created':
+            if (msg.success) {
+              console.log('✅ Tiles created successfully');
+              updateDebugPanel('Tiles created successfully');
+              addLogEntry('Tiles generated successfully!', 'success');
+            } else {
+              console.error('❌ Error creating tiles:', msg.error);
+              updateDebugPanel(`Error: ${msg.error}`);
+              addLogEntry(`Error generating tiles: ${msg.error}`, 'error');
+            }
+            break;
+          case 'frame-converted':
+            if (msg.success) {
+              console.log('✅ Frame conversion successful');
+              updateDebugPanel('Frame converted successfully');
+              addLogEntry('Converted to auto-layout frame successfully!', 'success');
+            } else {
+              console.error('❌ Error converting to frame:', msg.error);
+              updateDebugPanel(`Error: ${msg.error}`);
+              addLogEntry(`Error converting to frame: ${msg.error}`, 'error');
+            }
+            break;
+          case 'error':
+            console.error('❌ Error:', msg.message);
+            updateDebugPanel(`Error: ${msg.message}`);
+            addLogEntry(`Error: ${msg.message}`, 'error');
+            break;
+        }
+      };
+    });
+  </script>
+</body>
+</html> 

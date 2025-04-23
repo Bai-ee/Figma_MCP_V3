@@ -209,6 +209,7 @@ function filterFigmaNode(node: any) {
     id: node.id,
     name: node.name,
     type: node.type,
+    visible: node.visible, // Add visible property
   };
 
   if (node.fills && node.fills.length > 0) {

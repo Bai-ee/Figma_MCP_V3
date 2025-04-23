@@ -244,20 +244,20 @@
   <body>
     <div class="container">
       <div class="header">
-        <div class="header-logo">
+        <!-- <div class="header-logo">
           <img
             class="header-logo-image"
             src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAAA8CAMAAAANIilAAAAABGdBTUEAALGPC/xhBQAAAAFzUkdCAK7OHOkAAAAJcEhZcwAAEJwAABCcASbNOjQAAAB1UExURUdwTP////////////////39/f////////////////////////////7+/v////////////39/f////////////////////////////////////////////////////39/fn5+ejo6P///+rq6uXl5f////Ly8gf4a04AAAAkdFJOUwAOdkZCfz04zIgbT0pkIagnm7C9b6C2LWqSxBMyB11W2Ovsy3D12ZYAAALtSURBVEjHndcJt6ogEADgXNAUcWlxSQVN3/3/P/EBAgJpWdM9p5ue78xANE2n05vIUduffgvn1oA0bX+hvRc1DYjTPHe+tiGIoqhx4zTNq/y72lMURQtmqasuPc4dAmgwfWuZrqquiw8uNnC5BRJT3YXhIZ7Xris0oLjlmOrArz7VHpOb6wpNee0ITVMHvvd25/qgvtFwla8dpxV7xnTi7dbed7iuTY16lZoV7iXQb3cqRgjVgoviKTZSUw2719pbD2OEVu5yjnqeOpZ75lMMobVzfUcwC6lrofGJpdb3jGtj6TkkNKRWtXMsU+ciNdfQUwe+zZ7/vo1CYYgv39G/kShMS6mHL+g8F96K2Uqi52E6j3DFnsc4uR/hMwugYd9bOLoeSTvPE1yx4/sLh9B9fKbziHVM3z/G+dKb5wdKdysxsNCc4+2l/yk7EnrOVhwGBt9auqJ0t9gR13C4cl77bdil88SPuK9jxrXksHjab48Mwo+4ha3aSbZJ52JpC4GFbY7OdsVst4Lls/mKZe1y6fXTonS3RFsIN7C5dAJsO+WiI21jbd8xesFEtoUdLLjH+qGNJ9WRuj3MOOQNycaV6khvsLc0MxsD2Uq7bhcHuBZh4rFdujjT1c6GkaXtszCx3sW3MRRfNjwiI7EjGjGfFjZwUgM9CuNggqRVXz+vOGDTBOCP5UnHE73ghjK1jYNlEIma9UnHBb/qdkvq1MSQjk4yCvGk4UneQylLbWAIio3I1t26q4sNTuM01tqQe9+My5pYv9wk8Ypv92w7JpXYulGoD8aJ3C/bUUp8tW5EuTa2oXI7ZGLzahZYE0l03QqZWI8Lfh1lw+zxEoNIrF8Dm/NQT8rzgz+WP/oQmL6Ud4pud/4DZzMWPKjXZfJufOyiVzzKV4/609yelDaWiZsDc6+DSwOLxNqxeD/6Ah3zf674+Kyf3xUeDi3WDFIKzCpOv/5phB4MD+cs/OWXVdych/GBf/xJd4pL9+1i/wOElMO5v/co4wAAAABJRU5ErkJggg=="
           />
-        </div>
+        </div> -->
         <div class="header-text">
-          <h1>Cursor Talk To Figma Plugin</h1>
+          <h1>Bai-ee's Talk To Figma Plugin</h1>
           <p>Connect Figma to Cursor AI using MCP</p>
         </div>
       </div>
 
       <div class="tabs">
-        <div id="tab-connection" class="tab active">Connection</div>
+        <div id="tab-connection" class="tab active">MCP</div>
         <div id="tab-tools" class="tab">Tools</div>
         <div id="tab-tile" class="tab">Tile</div>
         <div id="tab-about" class="tab">About</div>
@@ -349,18 +349,67 @@
       <div id="content-tile" class="tab-content">
         <div class="tile-container">
           <div class="log-container" id="tile-log" style="height: 75px;"></div>
+          
+          <h2>Tile Map</h2>
+          <div class="form-group">
+            <label for="frameWidth">Frame Width (px):</label>
+            <input type="number" id="frameWidth" value="1200" min="1">
+          </div>
+          <div class="form-group">
+            <label for="frameHeight">Frame Height (px):</label>
+            <input type="number" id="frameHeight" value="900" min="1">
+          </div>
+          <div class="form-group">
+            <label for="gridSize">Grid Size (px):</label>
+            <input type="number" id="gridSize" value="8" min="1">
+          </div>
+          <button id="createGridFrame" class="button">Create Tile Map</button>
+          
+          <div style="margin: 20px 0; border-bottom: 1px solid #444;"></div>
+          
+          <h2>Centered Tile</h2>
+          <div class="form-group">
+            <label for="tileSize">Tile Size (px, must be divisible by 8):</label>
+            <input type="number" id="tileSize" value="32" min="8" step="8">
+          </div>
+          <button id="createCenteredTile" class="button">Create Centered Tile</button>
+          
+          <div style="margin: 20px 0; border-bottom: 1px solid #444;"></div>
+          
+          <h2>Grid Alignment</h2>
+          <div class="form-group">
+            <label for="alignmentGridSize">Alignment Grid Size (px):</label>
+            <input type="number" id="alignmentGridSize" value="32" min="1">
+          </div>
+          <button id="snapToGrid" class="button">Snap Selection to Grid</button>
+          
+          <div style="margin: 20px 0; border-bottom: 1px solid #444;"></div>
+          
+          <h2>Phaser Export</h2>
+          <div class="form-group">
+            <label for="tileWidth">Tile Width (px):</label>
+            <input type="number" id="tileWidth" value="32" min="1">
+          </div>
+          <div class="form-group">
+            <label for="tileHeight">Tile Height (px):</label>
+            <input type="number" id="tileHeight" value="32" min="1">
+          </div>
+          <div class="form-group">
+            <label for="tilesetName">Tileset Name:</label>
+            <input type="text" id="tilesetName" value="tileset" placeholder="Enter tileset name">
+          </div>
+          <div class="form-group">
+            <label for="mapName">Map Name:</label>
+            <input type="text" id="mapName" value="map" placeholder="Enter map name">
+          </div>
+          <button id="exportPhaserMap" class="button">Export Phaser Map</button>
+          
+          <div style="margin: 20px 0; border-bottom: 1px solid #444;"></div>
+          
           <h2>Selection Tools</h2>
           <button id="convertToFrame" class="button">Convert to Frame</button>
           <div style="margin: 20px 0; border-bottom: 1px solid #444;"></div>
           <h2>Tile Generator</h2>
-          <div class="form-group">
-            <label for="tileWidth">Tile Width (px):</label>
-            <input type="number" id="tileWidth" value="100" min="1">
-          </div>
-          <div class="form-group">
-            <label for="tileHeight">Tile Height (px):</label>
-            <input type="number" id="tileHeight" value="100" min="1">
-          </div>
           <div class="form-group">
             <label for="columns">Columns:</label>
             <input type="number" id="columns" value="3" min="1">
@@ -379,7 +428,7 @@
 
       <div id="content-about" class="tab-content">
         <div class="section">
-          <h2>About Cursor Talk To Figma Plugin</h2>
+          <h2>About Bai-ee's Talk To Figma Plugin</h2>
           <p>
             This plugin allows Cursor AI to communicate with Figma, enabling
             AI-assisted design operations. created by
@@ -691,6 +740,58 @@
         return result;
       }
 
+      // Override console.log to also write to log containers
+      const originalConsoleLog = console.log;
+      const originalConsoleError = console.error;
+      const originalConsoleInfo = console.info;
+
+      console.log = function() {
+        // Call original console.log
+        originalConsoleLog.apply(console, arguments);
+        
+        // Convert all arguments to strings and join them
+        const message = Array.from(arguments)
+          .map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg))
+          .join(' ');
+        
+        // Add to appropriate log container based on active tab
+        const activeTab = document.querySelector('.tab.active');
+        if (activeTab) {
+          const logTarget = activeTab.id === 'tab-tile' ? 'tile-log' : 'tools-log';
+          addLogEntry(message, 'info', logTarget);
+        }
+      };
+
+      console.error = function() {
+        // Call original console.error
+        originalConsoleError.apply(console, arguments);
+        
+        const message = Array.from(arguments)
+          .map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg))
+          .join(' ');
+        
+        const activeTab = document.querySelector('.tab.active');
+        if (activeTab) {
+          const logTarget = activeTab.id === 'tab-tile' ? 'tile-log' : 'tools-log';
+          addLogEntry(message, 'error', logTarget);
+        }
+      };
+
+      console.info = function() {
+        // Call original console.info
+        originalConsoleInfo.apply(console, arguments);
+        
+        const message = Array.from(arguments)
+          .map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg))
+          .join(' ');
+        
+        const activeTab = document.querySelector('.tab.active');
+        if (activeTab) {
+          const logTarget = activeTab.id === 'tab-tile' ? 'tile-log' : 'tools-log';
+          addLogEntry(message, 'info', logTarget);
+        }
+      };
+
       // Tab switching
       tabs.forEach((tab) => {
         tab.addEventListener("click", () => {
@@ -699,9 +800,106 @@
 
           tab.classList.add("active");
           const contentId = "content-" + tab.id.split("-")[1];
-          document.getElementById(contentId).classList.add("active");
+          const content = document.getElementById(contentId);
+          content.classList.add("active");
+
+          // If switching to tile tab, show welcome message
+          if (tab.id === 'tab-tile') {
+            console.log('👋 Welcome to the Tile Generator!');
+            console.log('🎮 Here you can create tile maps, generate tiles, and export to Phaser format.');
+            console.log('📝 Select a frame before using export features.');
+          }
         });
       });
+
+      // Function to format objects for logging
+      function formatObject(obj) {
+        if (typeof obj !== 'object') return obj;
+        
+        const formatted = {};
+        for (const [key, value] of Object.entries(obj)) {
+          if (value && typeof value === 'object') {
+            if (Array.isArray(value)) {
+              formatted[key] = `Array(${value.length})`;
+            } else {
+              formatted[key] = formatObject(value);
+            }
+          } else {
+            formatted[key] = value;
+          }
+        }
+        return formatted;
+      }
+
+      // Enhanced log entry function
+      function addLogEntry(message, type = 'info', target = 'tools-log') {
+        const logContainer = document.getElementById(target);
+        if (!logContainer) return;
+
+        // Filter out debug messages and system info
+        if (typeof message === 'string') {
+          if (message.startsWith('[DEBUG]') || 
+              message.startsWith('[INFO]') || 
+              message.includes('socket') || 
+              message.includes('WebSocket')) {
+            return;
+          }
+        }
+
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${type}`;
+        
+        const timestamp = document.createElement('span');
+        timestamp.className = 'timestamp';
+        timestamp.textContent = new Date().toLocaleTimeString();
+        entry.appendChild(timestamp);
+
+        // Format the message based on type
+        if (typeof message === 'string') {
+          // Clean up the message
+          let cleanMessage = message
+            .replace(/\[.*?\]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+          // Handle JSON strings
+          if (message.includes('{') && message.includes('}')) {
+            try {
+              const jsonStart = message.indexOf('{');
+              const prefix = message.substring(0, jsonStart).trim();
+              const jsonStr = message.substring(jsonStart);
+              const jsonData = JSON.parse(jsonStr);
+              
+              entry.appendChild(document.createTextNode(prefix + ' '));
+              
+              const jsonContent = document.createElement('pre');
+              jsonContent.className = 'structured-data';
+              jsonContent.textContent = JSON.stringify(formatObject(jsonData), null, 2);
+              entry.appendChild(jsonContent);
+            } catch (e) {
+              entry.appendChild(document.createTextNode(cleanMessage));
+            }
+          } else {
+            entry.appendChild(document.createTextNode(cleanMessage));
+          }
+        } else if (typeof message === 'object') {
+          const formatted = formatObject(message);
+          const jsonContent = document.createElement('pre');
+          jsonContent.className = 'structured-data';
+          jsonContent.textContent = JSON.stringify(formatted, null, 2);
+          entry.appendChild(jsonContent);
+        }
+        
+        logContainer.appendChild(entry);
+        
+        // Keep only the last 50 entries
+        while (logContainer.children.length > 50) {
+          logContainer.removeChild(logContainer.firstChild);
+        }
+        
+        // Scroll to the latest entry
+        entry.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
 
       // Connect to server
       connectButton.addEventListener("click", () => {
@@ -818,99 +1016,6 @@
             break;
         }
       };
-
-      // Log functionality
-      function addLogEntry(message, type = 'info', target = 'tools-log') {
-        const logContainer = document.getElementById(target);
-        if (!logContainer) return;
-
-        // Filter out debug messages and system info
-        if (typeof message === 'string') {
-          if (message.startsWith('[DEBUG]') || 
-              message.startsWith('[INFO]') || 
-              message.includes('socket') || 
-              message.includes('WebSocket')) {
-            return;
-          }
-        }
-
-        const entry = document.createElement('div');
-        entry.className = `log-entry ${type}`;
-        
-        const timestamp = document.createElement('span');
-        timestamp.className = 'timestamp';
-        timestamp.textContent = new Date().toLocaleTimeString();
-        entry.appendChild(timestamp);
-
-        // Format the message based on type
-        if (typeof message === 'string') {
-          // Handle operation completed messages with JSON
-          if (message.includes('Operation completed successfully:')) {
-            try {
-              const jsonStr = message.split('Operation completed successfully:')[1].trim();
-              const data = JSON.parse(jsonStr);
-              
-              // Format analysis results
-              if (data.message && data.statistics) {
-                const lines = data.message.split('\n');
-                const stats = data.statistics;
-                
-                const summary = document.createElement('div');
-                summary.className = 'analysis-summary';
-                summary.innerHTML = `
-                  ${lines[0]}<br>
-                  Layers: ${stats.totalLayers} total, ${stats.hiddenLayers} hidden, ${stats.lockedLayers} locked
-                `.trim();
-                
-                entry.appendChild(summary);
-                return logContainer.appendChild(entry);
-              }
-            } catch (e) {
-              // If JSON parsing fails, show clean message
-              const cleanMessage = message
-                .replace('Operation completed successfully:', '')
-                .replace(/\{.*\}/g, '')
-                .trim();
-              entry.appendChild(document.createTextNode(cleanMessage));
-            }
-          } else {
-            // Clean up other messages
-            let cleanMessage = message
-              .replace(/\[.*?\]/g, '')
-              .replace(/\s+/g, ' ')
-              .trim();
-            entry.appendChild(document.createTextNode(cleanMessage));
-          }
-        } else if (typeof message === 'object') {
-          // Handle direct object messages
-          const summary = document.createElement('div');
-          summary.className = 'analysis-summary';
-          
-          if (message.type === 'RECTANGLE') {
-            summary.textContent = `Rectangle: ${message.width}x${message.height}`;
-          } else if (message.type === 'FRAME') {
-            summary.textContent = `Frame: ${message.name} (${message.width}x${message.height})`;
-          } else if (message.type === 'TEXT') {
-            summary.textContent = `Text: "${message.characters?.substring(0, 30)}${message.characters?.length > 30 ? '...' : ''}"`;
-          } else if (message.statistics) {
-            summary.textContent = `Analysis: ${message.statistics.totalLayers} layers (${message.statistics.hiddenLayers} hidden, ${message.statistics.lockedLayers} locked)`;
-          } else {
-            summary.textContent = message.summary || 'Analysis complete';
-          }
-          
-          entry.appendChild(summary);
-        }
-        
-        logContainer.appendChild(entry);
-        
-        // Keep only the last 50 entries
-        while (logContainer.children.length > 50) {
-          logContainer.removeChild(logContainer.firstChild);
-        }
-        
-        // Scroll to the latest entry
-        entry.scrollIntoView({ behavior: 'smooth', block: 'end' });
-      }
 
       document.addEventListener('DOMContentLoaded', () => {
         // Tab handling
@@ -1181,83 +1286,185 @@
           }, '*');
         });
 
-        // Update the message handler to handle tile-specific messages
-        window.addEventListener('message', (event) => {
+        // Add grid frame creation functionality
+        document.getElementById('createGridFrame')?.addEventListener('click', () => {
+          console.log('🎮 Create Grid Frame button clicked');
+          
+          const frameWidth = parseInt(document.getElementById('frameWidth').value);
+          const frameHeight = parseInt(document.getElementById('frameHeight').value);
+          const gridSize = parseInt(document.getElementById('gridSize').value);
+          
+          console.log('📊 Grid frame parameters:', { frameWidth, frameHeight, gridSize });
+          addLogEntry('Creating grid frame...', 'info', 'tile-log');
+          
+          parent.postMessage({
+            pluginMessage: {
+              type: 'execute-command',
+              command: 'create_grid_frame',
+              params: {
+                width: frameWidth,
+                height: frameHeight,
+                gridSize: gridSize
+              }
+            }
+          }, '*');
+        });
+
+        // Add grid snap functionality
+        document.getElementById('snapToGrid')?.addEventListener('click', () => {
+          console.log('🎮 Snap to Grid button clicked');
+          
+          const gridSize = parseInt(document.getElementById('alignmentGridSize').value);
+          console.log('📏 Grid size:', gridSize);
+          
+          addLogEntry('Snapping selection to grid...', 'info', 'tile-log');
+          
+          parent.postMessage({
+            pluginMessage: {
+              type: 'execute-command',
+              command: 'snap_to_grid',
+              params: {
+                gridSize: gridSize
+              }
+            }
+          }, '*');
+        });
+
+        // Add Phaser map export functionality
+        document.getElementById('exportPhaserMap')?.addEventListener('click', async () => {
+          try {
+            const tileWidth = parseInt(document.getElementById('tileWidth').value);
+            const tileHeight = parseInt(document.getElementById('tileHeight').value);
+            const tilesetName = document.getElementById('tilesetName').value;
+            const mapName = document.getElementById('mapName').value;
+            
+            // Clear the log first
+            const logContainer = document.getElementById('tile-log');
+            if (logContainer) {
+              logContainer.innerHTML = '';
+            }
+            
+            // Log to tile tab directly
+            addLogEntry('🎮 Starting Phaser map export...', 'info', 'tile-log');
+            addLogEntry(`📊 Parameters: ${tileWidth}x${tileHeight} tiles, tileset: ${tilesetName}, map: ${mapName}`, 'info', 'tile-log');
+            
+            // Send command to plugin
+            parent.postMessage({
+              pluginMessage: {
+                type: 'execute-command',
+                command: 'export_phaser_map',
+                params: {
+                  tileWidth,
+                  tileHeight,
+                  tilesetName,
+                  mapName
+                }
+              }
+            }, '*');
+          } catch (error) {
+            addLogEntry(`❌ Export failed: ${error.message}`, 'error', 'tile-log');
+          }
+        });
+
+        // Update message handler for new commands
+        window.addEventListener('message', async (event) => {
           const message = event.data.pluginMessage;
           if (!message) return;
 
-          // Determine which log container to use based on the active tab
-          const activeTab = document.querySelector('.tab.active');
-          const logTarget = activeTab?.id === 'tab-tile' ? 'tile-log' : 'tools-log';
-
           switch (message.type) {
             case 'command-result':
-              if (message.command === 'get_selection') {
-                const result = message.result;
-                if (!result || result.selectionCount === 0 || !result.selection || result.selection.length === 0) {
-                  addLogEntry('No selection found', 'error', logTarget);
-                  return;
+              if (message.command === 'export_phaser_map' && message.result?.success) {
+                try {
+                  const mapData = message.result.mapData;
+                  const filename = `${mapData.tilesets[0].name || 'tilemap'}.json`;
+                  
+                  addLogEntry('✨ Map data received, preparing download...', 'info', 'tile-log');
+                  
+                  // Create the JSON content
+                  const dataStr = JSON.stringify(mapData, null, 2);
+                  const blob = new Blob([dataStr], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+
+                  // Create download link
+                  const downloadLink = document.createElement('a');
+                  downloadLink.href = url;
+                  downloadLink.download = filename;
+                  downloadLink.style.display = 'none';
+                  
+                  addLogEntry('📎 Created download link...', 'info', 'tile-log');
+
+                  // Add link to document and click it
+                  document.body.appendChild(downloadLink);
+                  addLogEntry('🖱️ Triggering download...', 'info', 'tile-log');
+                  downloadLink.click();
+                  
+                  // Cleanup
+                  document.body.removeChild(downloadLink);
+                  setTimeout(() => URL.revokeObjectURL(url), 100);
+                  
+                  addLogEntry('✅ Download started!', 'success', 'tile-log');
+                  addLogEntry(`💾 File name: ${filename}`, 'info', 'tile-log');
+                  addLogEntry('📂 Check your downloads folder', 'info', 'tile-log');
+
+                  // Add detailed export summary
+                  const summary = {
+                    filename: filename,
+                    size: `${mapData.width}x${mapData.height}`,
+                    tileSize: `${mapData.tilewidth}x${mapData.tileheight}`,
+                    totalTiles: mapData.tilesets[0].tilecount,
+                    tileset: mapData.tilesets[0].name,
+                    format: 'Phaser Tilemap JSON'
+                  };
+                  
+                  addLogEntry('📑 Export Summary:', 'info', 'tile-log');
+                  addLogEntry(summary, 'info', 'tile-log');
+
+                } catch (error) {
+                  addLogEntry(`❌ Error during download: ${error.message}`, 'error', 'tile-log');
                 }
-
-                // Get more details about the selected node
-                parent.postMessage({
-                  pluginMessage: {
-                    type: 'execute-command',
-                    command: 'get_node_info',
-                    params: {
-                      nodeId: result.selection[0]
-                    }
-                  }
-                }, '*');
-              } else if (message.command === 'get_node_info') {
-                const node = message.result;
-                addLogEntry(`Selected ${node.type.toLowerCase()}: ${node.width}x${node.height}`, 'info', logTarget);
-
-                // Calculate the square size (max of width or height)
-                const maxSize = Math.max(node.width, node.height);
-                const originalX = node.x;
-                const originalY = node.y;
-
-                // Create new frame with auto layout
-                parent.postMessage({
-                  pluginMessage: {
-                    type: 'execute-command',
-                    command: 'create_frame',
-                    params: {
-                      x: originalX,
-                      y: originalY,
-                      width: maxSize,
-                      height: maxSize,
-                      name: 'Auto Layout Frame',
-                      layoutMode: 'VERTICAL',
-                      primaryAxisAlignItems: 'CENTER',
-                      counterAxisAlignItems: 'CENTER',
-                      layoutSizingHorizontal: 'FIXED',
-                      layoutSizingVertical: 'FIXED',
-                      selection: node.id
-                    }
-                  }
-                }, '*');
-              } else if (message.result && message.result.name === 'Auto Layout Frame') {
-                const frame = message.result;
-                addLogEntry(`Created auto-layout frame: ${frame.width}x${frame.height}`, 'success', logTarget);
               }
               break;
-            case 'tiles-created':
-              if (message.success) {
-                addLogEntry('Tiles generated successfully!', 'success', logTarget);
-              } else {
-                addLogEntry(`Error generating tiles: ${message.error}`, 'error', logTarget);
-              }
-              break;
-            case 'frame-converted':
-              if (message.success) {
-                addLogEntry('Converted to auto-layout frame successfully!', 'success', logTarget);
-              } else {
-                addLogEntry(`Error converting to frame: ${message.error}`, 'error', logTarget);
+              
+            case 'command-error':
+              if (message.command === 'export_phaser_map') {
+                addLogEntry(`❌ Export failed: ${message.error}`, 'error', 'tile-log');
               }
               break;
           }
+        });
+
+        // Add centered tile creation functionality
+        document.getElementById('createCenteredTile')?.addEventListener('click', () => {
+          console.log('🎯 Create Centered Tile button clicked');
+          
+          const tileSize = parseInt(document.getElementById('tileSize').value);
+          
+          // Validate tile size is divisible by 8
+          if (tileSize % 8 !== 0) {
+            addLogEntry('Error: Tile size must be divisible by 8', 'error', 'tile-log');
+            return;
+          }
+          
+          console.log('📊 Tile parameters:', { tileSize });
+          addLogEntry('Creating centered tile...', 'info', 'tile-log');
+          
+          parent.postMessage({
+            pluginMessage: {
+              type: 'execute-command',
+              command: 'create_frame',
+              params: {
+                width: tileSize,
+                height: tileSize,
+                name: `Tile ${tileSize}x${tileSize}`,
+                layoutMode: 'VERTICAL',
+                layoutSizingHorizontal: 'FIXED',
+                layoutSizingVertical: 'FIXED',
+                primaryAxisAlignItems: 'CENTER',
+                counterAxisAlignItems: 'CENTER',
+                fillColor: { r: 1, g: 0.85, b: 0.3, a: 1 } // Yellow color
+              }
+            }
+          }, '*');
         });
       });
     </script>

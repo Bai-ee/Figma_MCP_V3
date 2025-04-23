@@ -103,6 +103,8 @@ function updateSettings(settings) {
 
 // Handle commands from UI
 async function handleCommand(command, params) {
+  console.log("Handling command:", command, "with params:", params);
+  
   switch (command) {
     case "get_document_info":
       return await getDocumentInfo();
@@ -180,6 +182,12 @@ async function handleCommand(command, params) {
       return await analyzeSelection();
     case "convert_to_frame":
       return await convertToFrame();
+    case "create_grid_frame":
+      return await createGridFrame(params);
+    case "snap_to_grid":
+      return await snapToGrid(params);
+    case "export_phaser_map":
+      return await exportPhaserMap(params);
     default:
       throw new Error(`Unknown command: ${command}`);
   }
@@ -466,119 +474,76 @@ async function createRectangle(params) {
 }
 
 async function createFrame(params) {
-  const {
-    x = 0,
-    y = 0,
-    width = 100,
-    height = 100,
-    name = "Frame",
-    parentId,
-    fillColor,
-    strokeColor,
-    strokeWeight,
-    layoutMode = "NONE",
-    layoutWrap = "NO_WRAP",
-    paddingTop = 10,
-    paddingRight = 10,
-    paddingBottom = 10,
-    paddingLeft = 10,
-    primaryAxisAlignItems = "MIN",
-    counterAxisAlignItems = "MIN",
-    layoutSizingHorizontal = "FIXED",
-    layoutSizingVertical = "FIXED",
-    itemSpacing = 0,
-  } = params || {};
+  console.log('🎨 Creating frame with params:', params);
 
-  const frame = figma.createFrame();
-  frame.x = x;
-  frame.y = y;
-  frame.resize(width, height);
-  frame.name = name;
-
-  // Set layout mode if provided
-  if (layoutMode !== "NONE") {
-    frame.layoutMode = layoutMode;
-    frame.layoutWrap = layoutWrap;
-
-    // Set padding values only when layoutMode is not NONE
-    frame.paddingTop = paddingTop;
-    frame.paddingRight = paddingRight;
-    frame.paddingBottom = paddingBottom;
-    frame.paddingLeft = paddingLeft;
-
-    // Set axis alignment only when layoutMode is not NONE
-    frame.primaryAxisAlignItems = primaryAxisAlignItems;
-    frame.counterAxisAlignItems = counterAxisAlignItems;
-
-    // Set layout sizing only when layoutMode is not NONE
-    frame.layoutSizingHorizontal = layoutSizingHorizontal;
-    frame.layoutSizingVertical = layoutSizingVertical;
-
-    // Set item spacing only when layoutMode is not NONE
-    frame.itemSpacing = itemSpacing;
-  }
-
-  // Set fill color if provided
-  if (fillColor) {
-    const paintStyle = {
-      type: "SOLID",
-      color: {
-        r: parseFloat(fillColor.r) || 0,
-        g: parseFloat(fillColor.g) || 0,
-        b: parseFloat(fillColor.b) || 0,
-      },
-      opacity: parseFloat(fillColor.a) || 1,
-    };
-    frame.fills = [paintStyle];
-  }
-
-  // Set stroke color and weight if provided
-  if (strokeColor) {
-    const strokeStyle = {
-      type: "SOLID",
-      color: {
-        r: parseFloat(strokeColor.r) || 0,
-        g: parseFloat(strokeColor.g) || 0,
-        b: parseFloat(strokeColor.b) || 0,
-      },
-      opacity: parseFloat(strokeColor.a) || 1,
-    };
-    frame.strokes = [strokeStyle];
-  }
-
-  // Set stroke weight if provided
-  if (strokeWeight !== undefined) {
-    frame.strokeWeight = strokeWeight;
-  }
-
-  // If parentId is provided, append to that node, otherwise append to current page
-  if (parentId) {
-    const parentNode = await figma.getNodeByIdAsync(parentId);
-    if (!parentNode) {
-      throw new Error(`Parent node not found with ID: ${parentId}`);
+  try {
+    // Get current selection
+    const selection = figma.currentPage.selection;
+    if (!selection || selection.length === 0) {
+      throw new Error('No selection found');
     }
-    if (!("appendChild" in parentNode)) {
-      throw new Error(`Parent node does not support children: ${parentId}`);
-    }
-    parentNode.appendChild(frame);
-  } else {
-    figma.currentPage.appendChild(frame);
-  }
 
-  return {
-    id: frame.id,
-    name: frame.name,
-    x: frame.x,
-    y: frame.y,
-    width: frame.width,
-    height: frame.height,
-    fills: frame.fills,
-    strokes: frame.strokes,
-    strokeWeight: frame.strokeWeight,
-    layoutMode: frame.layoutMode,
-    layoutWrap: frame.layoutWrap,
-    parentId: frame.parent ? frame.parent.id : undefined,
-  };
+    // Calculate center position of selection
+    const bounds = selection.reduce((acc, node) => {
+      if (!acc) {
+        return {
+          left: node.x,
+          right: node.x + node.width,
+          top: node.y,
+          bottom: node.y + node.height
+        };
+      }
+      return {
+        left: Math.min(acc.left, node.x),
+        right: Math.max(acc.right, node.x + node.width),
+        top: Math.min(acc.top, node.y),
+        bottom: Math.max(acc.bottom, node.y + node.height)
+      };
+    }, null);
+
+    if (!bounds) {
+      throw new Error('Could not calculate bounds');
+    }
+
+    const centerX = bounds.left + (bounds.right - bounds.left) / 2 - params.width / 2;
+    const centerY = bounds.top + (bounds.bottom - bounds.top) / 2 - params.height / 2;
+
+    // Create frame
+    const frame = figma.createFrame();
+    frame.x = centerX;
+    frame.y = centerY;
+    frame.resize(params.width, params.height);
+    frame.name = params.name || 'New Frame';
+
+    // Set layout properties
+    if (params.layoutMode) {
+      frame.layoutMode = params.layoutMode;
+      frame.primaryAxisAlignItems = params.primaryAxisAlignItems || 'CENTER';
+      frame.counterAxisAlignItems = params.counterAxisAlignItems || 'CENTER';
+      frame.layoutSizingHorizontal = params.layoutSizingHorizontal || 'FIXED';
+      frame.layoutSizingVertical = params.layoutSizingVertical || 'FIXED';
+    }
+
+    // Set fill color if provided
+    if (params.fillColor) {
+      frame.fills = [{
+        type: 'SOLID',
+        color: {
+          r: params.fillColor.r,
+          g: params.fillColor.g,
+          b: params.fillColor.b
+        },
+        opacity: params.fillColor.a || 1
+      }];
+    }
+
+    console.log('✅ Frame created successfully:', frame.id);
+    figma.notify('Frame created successfully');
+
+  } catch (error) {
+    console.error('❌ Error creating frame:', error);
+    figma.notify('Error creating frame: ' + error.message, { error: true });
+  }
 }
 
 async function createText(params) {
@@ -3104,4 +3069,235 @@ async function convertToFrame() {
   
   console.log('✅ Frame conversion complete');
   return frame;
+}
+
+async function createGridFrame(params) {
+  console.log('🎯 Creating grid frame...');
+  
+  try {
+    // Get viewport center
+    const viewport = figma.viewport;
+    console.log('📍 Viewport:', {
+      x: viewport.center.x,
+      y: viewport.center.y,
+      zoom: viewport.zoom
+    });
+
+    // Create frame
+    console.log('📦 Creating frame with dimensions:', {
+      width: params.width || 1200,
+      height: params.height || 900
+    });
+    
+    const frame = figma.createFrame();
+    frame.name = 'Grid Frame';
+    frame.resize(
+      params.width || 1200,
+      params.height || 900
+    );
+
+    // Position frame at viewport center
+    const centerX = viewport.center.x - (frame.width / 2);
+    const centerY = viewport.center.y - (frame.height / 2);
+    console.log('🎯 Positioning frame at center:', { x: centerX, y: centerY });
+    
+    frame.x = centerX;
+    frame.y = centerY;
+
+    // Set up grid
+    const gridSize = params.gridSize || 8;
+    console.log('📏 Setting up grid with size:', gridSize);
+    
+    const grid = {
+      pattern: 'GRID',
+      sectionSize: gridSize,
+      visible: true,
+      color: { r: 1, g: 0, b: 0, a: 1 } // 100% red
+    };
+    frame.layoutGrids = [grid];
+
+    // Enable snapping and set zoom
+    console.log('🔒 Configuring viewport and snapping');
+    figma.viewport.zoom = 1; // Reset zoom for better visibility
+    frame.constraints = { horizontal: 'CENTER', vertical: 'CENTER' };
+
+    // Scroll viewport to frame
+    figma.viewport.scrollAndZoomIntoView([frame]);
+
+    // Select the new frame
+    figma.currentPage.selection = [frame];
+    console.log('✅ Grid frame created successfully');
+
+    return {
+      success: true,
+      frame: {
+        id: frame.id,
+        name: frame.name,
+        width: frame.width,
+        height: frame.height,
+        gridSize: gridSize
+      }
+    };
+
+  } catch (error) {
+    console.error('❌ Error creating grid frame:', error);
+    throw new Error(`Failed to create grid frame: ${error.message}`);
+  }
+}
+
+async function snapToGrid(params) {
+  console.log('🎯 Starting grid snap operation...');
+  
+  try {
+    const selection = figma.currentPage.selection;
+    console.log(`📝 Current selection: ${selection.length} items`);
+    
+    if (selection.length === 0) {
+      throw new Error('Please select elements to snap to grid');
+    }
+
+    const gridSize = params.gridSize || 32;
+    console.log('📏 Grid size:', gridSize);
+
+    const snappedNodes = [];
+    
+    for (const node of selection) {
+      console.log('🔄 Processing node:', node.name);
+      
+      // Calculate nearest grid positions
+      const newX = Math.round(node.x / gridSize) * gridSize;
+      const newY = Math.round(node.y / gridSize) * gridSize;
+      
+      console.log('📍 Snapping coordinates:', {
+        from: { x: node.x, y: node.y },
+        to: { x: newX, y: newY }
+      });
+
+      // Move node to snapped position
+      node.x = newX;
+      node.y = newY;
+      
+      snappedNodes.push({
+        id: node.id,
+        name: node.name,
+        newPosition: { x: newX, y: newY }
+      });
+    }
+
+    console.log('✅ Grid snap complete');
+    return {
+      success: true,
+      snappedCount: selection.length,
+      nodes: snappedNodes
+    };
+
+  } catch (error) {
+    console.error('❌ Error snapping to grid:', error);
+    throw new Error(`Failed to snap to grid: ${error.message}`);
+  }
+}
+
+async function exportPhaserMap(params) {
+  console.log('🗺️ Exporting Phaser map with params:', params);
+
+  try {
+    const { tileWidth, tileHeight, tilesetName, mapName } = params;
+
+    if (!tileWidth || !tileHeight || !tilesetName || !mapName) {
+      throw new Error('Missing required parameters');
+    }
+
+    // Get current selection
+    const selection = figma.currentPage.selection;
+    if (!selection || selection.length === 0) {
+      throw new Error('No selection found');
+    }
+
+    // Validate selection is a frame
+    const frame = selection[0];
+    if (frame.type !== 'FRAME') {
+      throw new Error('Selected node must be a frame');
+    }
+
+    // Calculate grid dimensions
+    const cols = Math.floor(frame.width / tileWidth);
+    const rows = Math.floor(frame.height / tileHeight);
+
+    console.log(`📐 Grid dimensions: ${cols}x${rows}`);
+
+    // Initialize empty tilemap data
+    const tilemapData = {
+      type: 'map',
+      version: 1,
+      width: cols,
+      height: rows,
+      tilewidth: tileWidth,
+      tileheight: tileHeight,
+      orientation: 'orthogonal',
+      renderorder: 'right-down',
+      infinite: false,
+      nextlayerid: 2,
+      nextobjectid: 1,
+      properties: [],
+      tilesets: [
+        {
+          name: tilesetName,
+          firstgid: 1,
+          tilewidth: tileWidth,
+          tileheight: tileHeight,
+          spacing: 0,
+          margin: 0,
+          image: `${tilesetName}.png`,
+          imagewidth: frame.width,
+          imageheight: frame.height,
+          tilecount: cols * rows,
+          columns: cols
+        }
+      ],
+      layers: [
+        {
+          type: 'tilelayer',
+          name: 'Tile Layer 1',
+          x: 0,
+          y: 0,
+          width: cols,
+          height: rows,
+          opacity: 1,
+          visible: true,
+          data: []
+        }
+      ]
+    };
+
+    // Fill layer data with tile indices (1-based)
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const tileIndex = y * cols + x + 1; // 1-based indexing
+        tilemapData.layers[0].data.push(tileIndex);
+      }
+    }
+
+    // Create a text node with the JSON data
+    const textNode = figma.createText();
+    textNode.name = `${mapName}.json`;
+    textNode.x = frame.x + frame.width + 20;
+    textNode.y = frame.y;
+
+    // Load the default font before setting text content
+    await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+    textNode.characters = JSON.stringify(tilemapData, null, 2);
+
+    console.log('✅ Tilemap exported successfully');
+    figma.notify('Tilemap exported successfully');
+
+    return {
+      success: true,
+      mapData: tilemapData
+    };
+
+  } catch (error) {
+    console.error('❌ Error exporting tilemap:', error);
+    figma.notify('Error exporting tilemap: ' + error.message, { error: true });
+    throw error;
+  }
 }
