@@ -217,76 +217,11 @@ figma.ui.onmessage = async (msg) => {
       break;
     
     case 'export-selection':
-      console.log("Handling export request via Figma API");
-      try {
-        // Get current selection
-        const selection = figma.currentPage.selection;
-        console.log("Current selection:", selection);
-        
-        // Validate selection
-        if (!selection || selection.length === 0) {
-          throw new Error('No element selected. Please select an element to export.');
-        }
-        
-        if (selection.length > 1) {
-          console.log("Multiple elements selected, using first element");
-        }
-        
-        const node = selection[0];
-        
-        // Validate node can be exported
-        if (!node.exportAsync) {
-          throw new Error(`Selected element of type "${node.type}" cannot be exported. Please select a different element.`);
-        }
-        
-        console.log("Preparing to export node:", {
-          id: node.id,
-          name: node.name,
-          type: node.type,
-          width: node.width,
-          height: node.height
-        });
+      handleExportSelection(msg);
+      break;
 
-        // Set up export settings
-        const settings = {
-          format: 'PNG',
-          constraint: { type: 'SCALE', value: 2 }
-        };
-
-        // Export the node
-        console.log("Exporting with settings:", settings);
-        const bytes = await node.exportAsync(settings);
-        
-        // Log success and details
-        const details = {
-          nodeId: node.id,
-          nodeName: node.name,
-          nodeType: node.type,
-          format: settings.format,
-          scale: settings.constraint.value,
-          size: `${bytes.length} bytes`,
-          dimensions: `${Math.round(node.width)} x ${Math.round(node.height)}`
-        };
-        
-        console.log("Export successful:", details);
-        
-        // Send success message back to UI with the bytes for download
-        figma.ui.postMessage({
-          type: 'export-result',
-          success: true,
-          details: details,
-          bytes: bytes,
-          format: settings.format,
-          filename: `${node.name || 'export'}.${settings.format.toLowerCase()}`
-        });
-      } catch (error) {
-        console.error("Export failed:", error);
-        figma.ui.postMessage({
-          type: 'export-result',
-          success: false,
-          error: error.message || 'Export failed for unknown reason'
-        });
-      }
+    case 'analyze-layers':
+      handleAnalyzeLayers();
       break;
   }
 };
@@ -310,6 +245,7 @@ function updateSettings(settings) {
 // Handle commands from UI
 async function handleCommand(command, params) {
   console.log('Handling command:', command, 'with params:', params);
+
   try {
     switch (command) {
       case "get_document_info":
@@ -417,15 +353,51 @@ async function handleCommand(command, params) {
         return await snapToGrid(params);
       case "export_phaser_map":
         return await exportPhaserMap(params);
+      case "generate-tiles":
+        const { tileWidth, tileHeight, columns, rows, spacing } = params;
+        const frame = figma.createFrame();
+        frame.name = 'Tile Grid';
+        frame.layoutMode = 'HORIZONTAL';
+        frame.counterAxisSizingMode = 'AUTO';
+        frame.primaryAxisSizingMode = 'AUTO';
+        frame.layoutWrap = 'WRAP';
+        frame.itemSpacing = spacing;
+        frame.counterAxisSpacing = spacing;
+
+        // Generate tiles
+        for (let row = 0; row < rows; row++) {
+          for (let col = 0; col < columns; col++) {
+            const tile = figma.createRectangle();
+            tile.name = `Tile ${row + 1}-${col + 1}`;
+            tile.resize(tileWidth, tileHeight);
+            frame.appendChild(tile);
+          }
+        }
+
+        // Position the frame in the center of the viewport
+        const { x, y } = figma.viewport.center;
+        frame.x = x - (frame.width / 2);
+        frame.y = y - (frame.height / 2);
+
+        // Select the frame and zoom to it
+        figma.currentPage.selection = [frame];
+        figma.viewport.scrollAndZoomIntoView([frame]);
+
+        return {
+          success: true,
+          frame: {
+            id: frame.id,
+            name: frame.name,
+            width: frame.width,
+            height: frame.height
+          }
+        };
       default:
         throw new Error(`Unknown command: ${command}`);
     }
   } catch (error) {
     console.error('Command failed:', error);
-    sendCommandResult(command, { 
-      success: false, 
-      error: error.message 
-    });
+    throw error;
   }
 }
 
@@ -3497,5 +3469,121 @@ async function exportPhaserMap(params) {
     console.error('❌ Error exporting tilemap:', error);
     figma.notify('Error exporting tilemap: ' + error.message, { error: true });
     throw error;
+  }
+}
+
+// Add the analyze layers handler function
+function handleAnalyzeLayers() {
+  const selection = figma.currentPage.selection;
+  
+  // Map selection to include only necessary properties
+  const selectionData = selection.map(node => ({
+    id: node.id,
+    name: node.name,
+    type: node.type,
+    width: node.width,
+    height: node.height,
+    characters: node.type === 'TEXT' ? node.characters : undefined,
+    fills: node.fills,
+    strokes: node.strokes,
+    effects: node.effects,
+    children: node.children ? node.children.length : 0
+  }));
+
+  // Send the analysis result back to the UI
+  figma.ui.postMessage({
+    type: 'analyze-result',
+    selection: selectionData
+  });
+}
+
+async function handleExportSelection(msg) {
+  try {
+    const selection = figma.currentPage.selection;
+    
+    if (!selection || selection.length === 0) {
+      figma.ui.postMessage({
+        type: 'export-result',
+        success: false,
+        error: 'No element selected. Please select an element to export.'
+      });
+      return;
+    }
+
+    const node = selection[0];
+    const format = msg.format || 'PNG';
+    console.log('Export format requested:', format);
+
+    if (format === 'ZIP') {
+      console.log('Preparing PNG export for ZIP');
+      
+      try {
+        // Export as PNG with 2x scale
+        const pngExport = await node.exportAsync({
+          format: 'PNG',
+          constraint: { type: 'SCALE', value: 2 }
+        });
+        
+        console.log('PNG export successful');
+
+        // Prepare export details
+        const details = {
+          nodeId: node.id,
+          nodeName: node.name,
+          nodeType: node.type,
+          count: 1,
+          formats: ['PNG'],
+          totalBytes: pngExport.length
+        };
+
+        // Send success response with PNG export
+        figma.ui.postMessage({
+          type: 'export-result',
+          success: true,
+          format: 'ZIP',
+          filename: node.name,
+          exports: [{
+            filename: `${node.name}_2x.png`,
+            bytes: pngExport
+          }],
+          details: details
+        });
+      } catch (error) {
+        console.error('Failed to export PNG:', error);
+        figma.ui.postMessage({
+          type: 'export-result',
+          success: false,
+          error: `Failed to export PNG: ${error.message}`
+        });
+      }
+    } else {
+      // Handle regular single-format export
+      const bytes = await node.exportAsync({
+        format: format,
+        constraint: { type: 'SCALE', value: 2 }
+      });
+
+      figma.ui.postMessage({
+        type: 'export-result',
+        success: true,
+        format: format,
+        filename: `${node.name}_2x.${format.toLowerCase()}`,
+        bytes: bytes,
+        details: {
+          nodeId: node.id,
+          nodeName: node.name,
+          nodeType: node.type,
+          dimensions: `${node.width}x${node.height}`,
+          size: `${(bytes.length / 1024).toFixed(2)} KB`
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Export error:', error);
+    figma.ui.postMessage({
+      type: 'export-result',
+      success: false,
+      error: error.message
+    });
   }
 }

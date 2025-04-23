@@ -3,6 +3,58 @@
   <head>
     <meta charset="utf-8" />
     <title>Cursor MCP Plugin</title>
+    <script>
+      // First attempt to load from CDN with fallback
+      (function loadJSZip() {
+        // Try loading from CDN first
+        var script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+        script.onerror = function() {
+          console.log('CDN load failed, using embedded version');
+          // Embedded version as fallback
+          window.JSZip = (function(){ 
+            return function JSZip(){
+              this.files = {};
+              this.comment = null;
+              this.root = "";
+              this.clone = function(){
+                var newObj = new JSZip();
+                for (var i in this) {
+                  if (typeof this[i] !== "function") {
+                    newObj[i] = this[i];
+                  }
+                }
+                return newObj;
+              };
+            };
+          })();
+        };
+        document.head.appendChild(script);
+      })();
+    </script>
+    <script>
+      // Verify JSZip availability
+      function checkJSZip() {
+        if (typeof JSZip === 'undefined') {
+          console.error('❌ JSZip not available');
+          var error = document.createElement('div');
+          error.style.cssText = 'position:fixed;top:0;left:0;right:0;background:red;color:white;padding:10px;text-align:center;z-index:9999;';
+          error.textContent = 'Error: JSZip library failed to load';
+          document.body.insertBefore(error, document.body.firstChild);
+          return false;
+        }
+        try {
+          var test = new JSZip();
+          console.log('✅ JSZip loaded and working');
+          return true;
+        } catch (e) {
+          console.error('❌ JSZip instantiation failed:', e);
+          return false;
+        }
+      }
+      // Check after a short delay to ensure scripts have loaded
+      setTimeout(checkJSZip, 500);
+    </script>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
@@ -533,6 +585,9 @@
             <button id="export-selection" class="secondary">
               Export Selection
             </button>
+            <button id="export-selection-zip" class="secondary">
+              Export as PNG (2x)
+            </button>
           </div>
         </div>
       </div>
@@ -710,7 +765,7 @@
                 placeholder="Enter your OpenAI API key"
               />
               <button class="toggle-visibility" id="toggle-key-visibility">👁️</button>
-            </div>
+        </div>
             <div class="api-key-status" id="api-key-status"></div>
             <button id="save-api-key">Save API Key</button>
           </div>
@@ -1533,16 +1588,32 @@
             console.log('📤 Export button clicked');
             addLogEntry('Getting current selection...', 'info');
             
-            // Send message directly to plugin to get selection and export
             parent.postMessage({ 
               pluginMessage: { 
-                type: 'export-selection'
+                type: 'export-selection',
+                format: 'PNG'
               }
             }, '*');
           };
         }
 
-        // Update message handler to handle selection info and export result
+        // Add ZIP export button handler
+        const exportSelectionZipBtn = document.getElementById('export-selection-zip');
+        if (exportSelectionZipBtn) {
+          exportSelectionZipBtn.onclick = () => {
+            console.log('📤 ZIP Export button clicked');
+            addLogEntry('Preparing ZIP export...', 'info');
+            
+              parent.postMessage({
+                pluginMessage: {
+                type: 'export-selection',
+                format: 'ZIP'
+                }
+              }, '*');
+          };
+        }
+
+        // Update message handler to handle ZIP exports
         window.addEventListener('message', async (event) => {
           const message = event.data.pluginMessage;
           if (!message) return;
@@ -1553,38 +1624,75 @@
             
             if (message.success) {
               try {
-                // Create blob from bytes
-                const mimeType = `image/${message.format.toLowerCase()}`;
-                const blob = new Blob([message.bytes], { type: mimeType });
-                
-                // Create and trigger download
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = message.filename;
-                document.body.appendChild(link);
-                
-                // Log export details
-                addLogEntry('Export successful!', 'success');
-                if (message.details) {
+                if (message.format === 'ZIP') {
+                  // Create new ZIP file
+                  const zip = new JSZip();
+                  
+                  // Add PNG export to the ZIP
+                  const exp = message.exports[0];
+                  zip.file(exp.filename, exp.bytes);
+                  addLogEntry(`Added ${exp.filename} to ZIP`, 'info');
+                  
+                  // Generate ZIP file
+                  zip.generateAsync({type: "blob"})
+                    .then(blob => {
+                      // Create download link
+                      const link = document.createElement('a');
+                      link.href = URL.createObjectURL(blob);
+                      link.download = `${message.filename}_export.zip`;
+                      
+                      // Log export details
+                      addLogEntry('ZIP Export successful!', 'success');
+                      addLogEntry(`Exported PNG file for "${message.details.nodeName}"`, 'info');
+                      addLogEntry(`Total size: ${(message.details.totalBytes / 1024).toFixed(2)} KB`, 'info');
+                      
+                      // Trigger download
+                      document.body.appendChild(link);
+                      link.click();
+                      
+                      // Cleanup
+                      document.body.removeChild(link);
+                      URL.revokeObjectURL(link.href);
+                      
+                      // Show success message
+                      statusElement.textContent = 'Export successful! ZIP file download started.';
+                      statusElement.className = 'status-message success';
+                    })
+                    .catch(error => {
+                      console.error('Error generating ZIP:', error);
+                      addLogEntry(`Error generating ZIP: ${error.message}`, 'error');
+                      statusElement.textContent = 'Error generating ZIP: ' + error.message;
+                      statusElement.className = 'status-message error';
+                    });
+                  } else {
+                  // Handle regular export (existing code)
+                  const mimeType = `image/${message.format.toLowerCase()}`;
+                  const blob = new Blob([message.bytes], { type: mimeType });
+                  const link = document.createElement('a');
+                  link.href = URL.createObjectURL(blob);
+                  link.download = message.filename;
+                  
+                  // Log export details
+                  addLogEntry('Export successful!', 'success');
                   addLogEntry(`Exported ${message.details.nodeType} "${message.details.nodeName}"`, 'info');
                   addLogEntry(`Size: ${message.details.dimensions}, ${message.details.size}`, 'info');
+                  
+                  // Trigger download
+                  document.body.appendChild(link);
+                  link.click();
+                  
+                  // Cleanup
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(link.href);
+                  
+                  // Show success message
+                  statusElement.textContent = 'Export successful! File download started.';
+                  statusElement.className = 'status-message success';
                 }
                 
-                // Trigger download
-                link.click();
-                
-                // Cleanup
-                document.body.removeChild(link);
-                URL.revokeObjectURL(link.href);
-                
-                // Show success message
-                statusElement.textContent = 'Export successful! File download started.';
-                statusElement.className = 'status-message success';
                 setTimeout(() => {
                   statusElement.className = 'status-message';
                 }, 3000);
-                
-                console.log('Download triggered successfully');
               } catch (error) {
                 console.error('Error during download:', error);
                 addLogEntry(`Error during download: ${error.message}`, 'error');
@@ -1593,8 +1701,8 @@
                 setTimeout(() => {
                   statusElement.className = 'status-message';
                 }, 5000);
-              }
-            } else {
+                  }
+                } else {
               console.error('Export failed:', message.error);
               addLogEntry(`Export failed: ${message.error}`, 'error');
               statusElement.textContent = message.error || 'Export failed';
@@ -1604,230 +1712,139 @@
               }, 5000);
             }
           }
-          // ... existing code ...
         });
 
-        // Analyze section buttons
+        // Add analyze layers button handler
         const analyzeLayers = document.getElementById('analyze-layers');
-        const deleteLayersBtn = document.getElementById('delete-layers');
-        let hiddenLayerIds = []; // Store hidden layer IDs
-
         if (analyzeLayers) {
-          analyzeLayers.onclick = async () => {
-            console.log('🔍 Analyze button clicked');
-            addLogEntry('Analyzing selected element...', 'info');
-            hiddenLayerIds = []; // Reset hidden layer IDs
-            console.log('🔄 Reset hiddenLayerIds:', hiddenLayerIds);
-            deleteLayersBtn.disabled = true; // Reset delete button state
-            console.log('🔒 Delete button disabled');
-            
+          analyzeLayers.onclick = () => {
+            addLogEntry('Analyzing selected layers...', 'info');
             parent.postMessage({ 
               pluginMessage: { 
-                type: 'execute-command',
-                command: 'analyze_selection'
+                type: 'analyze-layers'
               }
             }, '*');
-            console.log('📤 Sent analyze_selection command');
           };
         }
 
-        if (deleteLayersBtn) {
-          deleteLayersBtn.onclick = async () => {
-            console.log('🗑️ Delete button clicked');
-            console.log('📊 Current hidden layer IDs:', hiddenLayerIds);
-            
-            if (hiddenLayerIds.length > 0) {
-              addLogEntry(`Deleting ${hiddenLayerIds.length} hidden layers...`, 'info');
-              console.log(`🗑️ Attempting to delete ${hiddenLayerIds.length} hidden layers`);
-              parent.postMessage({
-                pluginMessage: {
-                  type: 'execute-command',
-                  command: 'delete_multiple_nodes',
-                  params: {
-                    nodeIds: hiddenLayerIds
-                  }
-                }
-              }, '*');
-            } else {
-              console.log('⚠️ No hidden layers to delete');
-            }
-          };
-        }
-
-        // Add log entries for command results and errors
-        window.addEventListener('message', (event) => {
+        // Update message handler to include analyze layers response
+        window.addEventListener('message', async (event) => {
           const message = event.data.pluginMessage;
           if (!message) return;
 
-          console.log('📨 Received message from plugin:', message);
+          if (message.type === 'analyze-result') {
+            console.log('Received analysis result:', message);
+            
+            if (message.selection && message.selection.length > 0) {
+              addLogEntry(`Found ${message.selection.length} selected elements:`, 'success');
+              
+              message.selection.forEach(node => {
+                // Create detailed log entry for each node
+                const details = [
+                  `Type: ${node.type}`,
+                  `Name: ${node.name}`,
+                  `ID: ${node.id}`,
+                  node.width ? `Size: ${node.width}x${node.height}px` : '',
+                  node.characters ? `Text: "${node.characters}"` : '',
+                  node.fills ? `Fills: ${node.fills.length}` : '',
+                  node.strokes ? `Strokes: ${node.strokes.length}` : '',
+                  node.effects ? `Effects: ${node.effects.length}` : '',
+                  node.children ? `Children: ${node.children.length}` : ''
+                ].filter(detail => detail); // Remove empty strings
 
-          switch (message.type) {
-            case 'command-result':
-              if (message.command === 'analyze_selection' && message.result) {
-                console.log('📊 Analyze selection result:', message.result);
-                const result = message.result;
-                
-                if (result.raw && result.statistics) {
-                  console.log('📈 Statistics:', result.statistics);
-                  console.log('🌳 Raw node data:', result.raw);
-                  
-                  if (result.statistics.hiddenLayers > 0) {
-                    console.log(`🔍 Found ${result.statistics.hiddenLayers} hidden layers`);
-                    // Enable delete button if hidden layers are found
-                    deleteLayersBtn.disabled = false;
-                    console.log('🔓 Delete button enabled');
-                    
-                    // Collect hidden layer IDs recursively
-                    function collectHiddenLayerIds(node) {
-                      if (!node) {
-                        console.log('⚠️ Node is null in collectHiddenLayerIds');
-                        return;
-                      }
-                      
-                      if (node.visible === false) {
-                        console.log('🎯 Found hidden node:', node.id);
-                        hiddenLayerIds.push(node.id);
-                      }
-                      
-                      if (node.children) {
-                        console.log(`👶 Processing ${node.children.length} children of node ${node.id}`);
-                        node.children.forEach(child => collectHiddenLayerIds(child));
-                      }
-                    }
-                    
-                    hiddenLayerIds = []; // Reset before collecting
-                    console.log('🔄 Reset hiddenLayerIds before collection');
-                    collectHiddenLayerIds(result.raw);
-                    console.log('✅ Collected hidden layer IDs:', hiddenLayerIds);
-                  } else {
-                    console.log('ℹ️ No hidden layers found');
-                    deleteLayersBtn.disabled = true;
-                    hiddenLayerIds = [];
-                  }
-                } else {
-                  console.log('⚠️ Invalid result format:', result);
-                }
-              }
-              addLogEntry(`Operation completed successfully: ${JSON.stringify(message.result)}`, 'success');
-              break;
-            case 'command-error':
-              console.log('❌ Command error:', message.error);
-              addLogEntry(`Error: ${message.error}`, 'error');
-              break;
-            case 'command_progress':
-              console.log('📈 Command progress:', message);
-              if (message.status === 'started') {
-                addLogEntry(`Operation started: ${message.message}`, 'info');
-              } else if (message.status === 'completed') {
-                addLogEntry(`Operation completed: ${message.message}`, 'success');
-              } else if (message.status === 'error') {
-                addLogEntry(`Operation failed: ${message.message}`, 'error');
-              }
-              break;
+                const detailsStr = details.join('\n');
+                addLogEntry(detailsStr, 'info');
+              });
+            } else {
+              addLogEntry('No elements selected', 'error');
+            }
           }
         });
 
-        // Add convert to frame functionality
-        document.getElementById('convertToFrame')?.addEventListener('click', () => {
-          console.log('🔄 Convert to Frame button clicked');
-          addLogEntry('Converting selection to frame...', 'info', 'tile-log');
-          console.log('📤 Sending convert_to_frame command...');
-          
-          parent.postMessage({ 
-            pluginMessage: { 
-              type: 'execute-command',
-              command: 'convert_to_frame'
-            }
-          }, '*');
-          console.log('📨 Command sent to plugin');
-        });
+        // Map & Sprites Tab Handlers
+        const createGridFrameBtn = document.getElementById('createGridFrame');
+        const createCenteredTileBtn = document.getElementById('createCenteredTile');
+        const snapToGridBtn = document.getElementById('snapToGrid');
+        const exportPhaserMapBtn = document.getElementById('exportPhaserMap');
+        const convertToFrameBtn = document.getElementById('convertToFrame');
+        const generateTilesBtn = document.getElementById('generateTiles');
 
-        // Add tile generation functionality
-        document.getElementById('generateTiles')?.addEventListener('click', () => {
-          const tileWidth = parseInt(document.getElementById('tileWidth').value);
-          const tileHeight = parseInt(document.getElementById('tileHeight').value);
-          const columns = parseInt(document.getElementById('columns').value);
-          const rows = parseInt(document.getElementById('rows').value);
-          const spacing = parseInt(document.getElementById('spacing').value);
-
-          addLogEntry('Generating tiles...', 'info', 'tile-log');
-          parent.postMessage({
-            pluginMessage: {
-              type: 'generate-tiles',
-              tileWidth,
-              tileHeight,
-              columns,
-              rows,
-              spacing
-            }
-          }, '*');
-        });
-
-        // Add grid frame creation functionality
-        document.getElementById('createGridFrame')?.addEventListener('click', () => {
-          console.log('🎮 Create Grid Frame button clicked');
-          
-          const frameWidth = parseInt(document.getElementById('frameWidth').value);
-          const frameHeight = parseInt(document.getElementById('frameHeight').value);
-          const gridSize = parseInt(document.getElementById('gridSize').value);
-          
-          console.log('📊 Grid frame parameters:', { frameWidth, frameHeight, gridSize });
-          addLogEntry('Creating grid frame...', 'info', 'tile-log');
-          
-          parent.postMessage({
-            pluginMessage: {
-              type: 'execute-command',
-              command: 'create_grid_frame',
-              params: {
-                width: frameWidth,
-                height: frameHeight,
-                gridSize: gridSize
+        if (createGridFrameBtn) {
+          createGridFrameBtn.onclick = () => {
+            const width = parseInt(document.getElementById('frameWidth').value);
+            const height = parseInt(document.getElementById('frameHeight').value);
+            const gridSize = parseInt(document.getElementById('gridSize').value);
+            
+            addLogEntry('Creating grid frame...', 'info');
+            parent.postMessage({ 
+              pluginMessage: { 
+                type: 'execute-command',
+                command: 'create_grid_frame',
+                params: {
+                  width,
+                  height,
+                  gridSize
+                }
               }
-            }
-          }, '*');
-        });
+            }, '*');
+          };
+        }
 
-        // Add grid snap functionality
-        document.getElementById('snapToGrid')?.addEventListener('click', () => {
-          console.log('🎮 Snap to Grid button clicked');
-          
-          const gridSize = parseInt(document.getElementById('alignmentGridSize').value);
-          console.log('📏 Grid size:', gridSize);
-          
-          addLogEntry('Snapping selection to grid...', 'info', 'tile-log');
-          
-          parent.postMessage({
-            pluginMessage: {
-              type: 'execute-command',
-              command: 'snap_to_grid',
-              params: {
-                gridSize: gridSize
+        if (createCenteredTileBtn) {
+          createCenteredTileBtn.onclick = () => {
+            const tileSize = parseInt(document.getElementById('tileSize').value);
+            if (tileSize % 8 !== 0) {
+              addLogEntry('Tile size must be divisible by 8', 'error');
+              return;
+            }
+            
+            addLogEntry('Creating centered tile...', 'info');
+            parent.postMessage({ 
+              pluginMessage: { 
+                type: 'execute-command',
+                command: 'create_frame',
+                params: {
+                  x: 0,
+                  y: 0,
+                  width: tileSize,
+                  height: tileSize,
+                  name: 'Centered Tile',
+                  layoutMode: 'VERTICAL',
+                  primaryAxisAlignItems: 'CENTER',
+                  counterAxisAlignItems: 'CENTER'
+                }
               }
-            }
-          }, '*');
-        });
+            }, '*');
+          };
+        }
 
-        // Add Phaser map export functionality
-        document.getElementById('exportPhaserMap')?.addEventListener('click', async () => {
-          try {
+        if (snapToGridBtn) {
+          snapToGridBtn.onclick = () => {
+            const gridSize = parseInt(document.getElementById('alignmentGridSize').value);
+            
+            addLogEntry('Snapping selection to grid...', 'info');
+            parent.postMessage({ 
+              pluginMessage: { 
+                type: 'execute-command',
+                command: 'snap_to_grid',
+                params: {
+                  gridSize
+                }
+              }
+            }, '*');
+          };
+        }
+
+        if (exportPhaserMapBtn) {
+          exportPhaserMapBtn.onclick = () => {
             const tileWidth = parseInt(document.getElementById('tileWidth').value);
             const tileHeight = parseInt(document.getElementById('tileHeight').value);
             const tilesetName = document.getElementById('tilesetName').value;
             const mapName = document.getElementById('mapName').value;
             
-            // Clear the log first
-            const logContainer = document.getElementById('tile-log');
-            if (logContainer) {
-              logContainer.innerHTML = '';
-            }
-            
-            // Log to tile tab directly
-            addLogEntry('🎮 Starting Phaser map export...', 'info', 'tile-log');
-            addLogEntry(`📊 Parameters: ${tileWidth}x${tileHeight} tiles, tileset: ${tilesetName}, map: ${mapName}`, 'info', 'tile-log');
-            
-            // Send command to plugin
-            parent.postMessage({
-              pluginMessage: {
+            addLogEntry('Exporting Phaser map...', 'info');
+            parent.postMessage({ 
+              pluginMessage: { 
                 type: 'execute-command',
                 command: 'export_phaser_map',
                 params: {
@@ -1838,43 +1855,91 @@
                 }
               }
             }, '*');
-          } catch (error) {
-            addLogEntry(`❌ Export failed: ${error.message}`, 'error', 'tile-log');
-          }
-        });
+          };
+        }
 
-        // Add centered tile creation functionality
-        document.getElementById('createCenteredTile')?.addEventListener('click', () => {
-          console.log('🎯 Create Centered Tile button clicked');
-          
-          const tileSize = parseInt(document.getElementById('tileSize').value);
-          
-          // Validate tile size is divisible by 8
-          if (tileSize % 8 !== 0) {
-            addLogEntry('Error: Tile size must be divisible by 8', 'error', 'tile-log');
-            return;
-          }
-          
-          console.log('📊 Tile parameters:', { tileSize });
-          addLogEntry('Creating centered tile...', 'info', 'tile-log');
-          
-          parent.postMessage({
-            pluginMessage: {
-              type: 'execute-command',
-              command: 'create_frame',
-              params: {
-                width: tileSize,
-                height: tileSize,
-                name: `Tile ${tileSize}x${tileSize}`,
-                layoutMode: 'VERTICAL',
-                layoutSizingHorizontal: 'FIXED',
-                layoutSizingVertical: 'FIXED',
-                primaryAxisAlignItems: 'CENTER',
-                counterAxisAlignItems: 'CENTER',
-                fillColor: { r: 1, g: 0.85, b: 0.3, a: 1 } // Yellow color
+        if (convertToFrameBtn) {
+          convertToFrameBtn.onclick = () => {
+            addLogEntry('Converting selection to frame...', 'info');
+            parent.postMessage({ 
+              pluginMessage: { 
+                type: 'execute-command',
+                command: 'convert_to_frame'
               }
-            }
-          }, '*');
+            }, '*');
+          };
+        }
+
+        if (generateTilesBtn) {
+          generateTilesBtn.onclick = () => {
+            const columns = parseInt(document.getElementById('columns').value);
+            const rows = parseInt(document.getElementById('rows').value);
+            const spacing = parseInt(document.getElementById('spacing').value);
+            const tileWidth = parseInt(document.getElementById('tileWidth').value);
+            const tileHeight = parseInt(document.getElementById('tileHeight').value);
+            
+            addLogEntry('Generating tiles...', 'info');
+            parent.postMessage({ 
+              pluginMessage: { 
+                type: 'generate-tiles',
+                tileWidth,
+                tileHeight,
+                columns,
+                rows,
+                spacing
+              }
+            }, '*');
+          };
+        }
+
+        // Add message handler for Map & Sprites responses
+        window.addEventListener('message', (event) => {
+          const msg = event.data.pluginMessage;
+          if (!msg) return;
+
+          switch (msg.type) {
+            case 'grid-frame-created':
+              if (msg.success) {
+                addLogEntry('Grid frame created successfully!', 'success');
+                addLogEntry(`Frame size: ${msg.frame.width}x${msg.frame.height}, Grid size: ${msg.frame.gridSize}px`, 'info');
+              } else {
+                addLogEntry(`Error creating grid frame: ${msg.error}`, 'error');
+              }
+              break;
+
+            case 'snap-to-grid-complete':
+              if (msg.success) {
+                addLogEntry(`Snapped ${msg.snappedCount} elements to grid`, 'success');
+              } else {
+                addLogEntry(`Error snapping to grid: ${msg.error}`, 'error');
+              }
+              break;
+
+            case 'phaser-map-exported':
+              if (msg.success) {
+                addLogEntry('Phaser map exported successfully!', 'success');
+                addLogEntry(`Map dimensions: ${msg.mapData.width}x${msg.mapData.height} tiles`, 'info');
+              } else {
+                addLogEntry(`Error exporting Phaser map: ${msg.error}`, 'error');
+              }
+              break;
+
+            case 'frame-converted':
+              if (msg.success) {
+                addLogEntry('Converted to frame successfully!', 'success');
+              } else {
+                addLogEntry(`Error converting to frame: ${msg.error}`, 'error');
+              }
+              break;
+
+            case 'tiles-generated':
+              if (msg.success) {
+                addLogEntry('Tiles generated successfully!', 'success');
+              } else {
+                addLogEntry(`Error generating tiles: ${msg.error}`, 'error');
+              }
+              break;
+          }
         });
       });
     </script>
