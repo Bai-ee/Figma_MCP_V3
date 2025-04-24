@@ -346,7 +346,9 @@ async function handleCommand(command, params) {
       case "analyze_selection":
         return await analyzeSelection();
       case "convert_to_frame":
-        return await convertToFrame();
+        return await convertToFrame(params);
+      case "create_atlas":
+        return await createAtlas(params);
       case "create_grid_frame":
         return await createGridFrame(params);
       case "snap_to_grid":
@@ -3094,8 +3096,8 @@ async function analyzeSelection() {
   return result;
 }
 
-async function convertToFrame() {
-  console.log('🎯 Converting selection to frame...');
+async function convertToFrame(params = {}) {
+  console.log('🎯 Converting selection to frame...', params);
   
   // Get current selection
   const selection = figma.currentPage.selection;
@@ -3117,7 +3119,7 @@ async function convertToFrame() {
   // Create new auto-layout frame
   console.log('📦 Creating new auto-layout frame...');
   const frame = figma.createFrame();
-  frame.name = 'Auto Layout Frame';
+  frame.name = 'Sprite Frame';
   
   // Make it square based on the larger dimension
   const maxSize = Math.max(node.width, node.height);
@@ -3132,21 +3134,51 @@ async function convertToFrame() {
   frame.layoutSizingHorizontal = 'FIXED';
   frame.layoutSizingVertical = 'FIXED';
   
-  // Position frame at original location
-  console.log('📍 Positioning frame at:', { x: node.x, y: node.y });
-  frame.x = node.x;
-  frame.y = node.y;
+  // Position frame at the center of the viewport
+  const viewport = figma.viewport;
+  frame.x = viewport.center.x - (maxSize / 2);
+  frame.y = viewport.center.y - (maxSize / 2);
   
   // Move the selected node into the frame
   console.log('➡️ Moving node into frame...');
   frame.appendChild(node);
-  
-  // Select the new frame
-  console.log('✨ Selecting new frame...');
+
+  // Set up pixel grid with specified or default size
+  const gridSize = params.gridSize || 8; // Default to 8 if not specified
+  console.log(`📏 Setting up ${gridSize}x${gridSize} pixel grid...`);
+  const grid = {
+    pattern: 'GRID',
+    sectionSize: gridSize,
+    visible: true,
+    color: { r: 1, g: 0, b: 0, a: 1 } // 100% red
+  };
+  frame.layoutGrids = [grid];
+
+  // Select the new frame and ensure it's visible in the viewport
   figma.currentPage.selection = [frame];
   
-  console.log('✅ Frame conversion complete');
-  return frame;
+  // Zoom to a comfortable level (80% of viewport)
+  const padding = 100; // Add padding around the frame
+  figma.viewport.scrollAndZoomIntoView([frame]);
+  
+  // Additional zoom adjustment for better visibility
+  const targetZoom = Math.min(
+    (viewport.bounds.width * 0.8) / frame.width,
+    (viewport.bounds.height * 0.8) / frame.height
+  );
+  figma.viewport.zoom = targetZoom;
+  
+  console.log('✨ Frame created and centered in viewport');
+  return {
+    success: true,
+    frame: {
+      id: frame.id,
+      name: frame.name,
+      width: frame.width,
+      height: frame.height,
+      gridSize: gridSize
+    }
+  };
 }
 
 async function createGridFrame(params) {
@@ -3586,4 +3618,232 @@ async function handleExportSelection(msg) {
       error: error.message
     });
   }
+}
+
+async function createAtlas(params = {}) {
+  console.log('🗺️ Creating atlas from selection...', params);
+  
+  // Get current selection
+  const selection = figma.currentPage.selection;
+  console.log(`📝 Current selection: ${selection.length} items`);
+  
+  if (selection.length < 2) {
+    throw new Error('Please select at least 2 frames to create an atlas');
+  }
+
+  // Validate that all selected items are frames
+  const invalidItems = selection.filter(node => node.type !== 'FRAME');
+  if (invalidItems.length > 0) {
+    throw new Error('All selected items must be frames');
+  }
+
+  const gridSize = params.gridSize || 8;
+  
+  // First pass: snap all frame dimensions to grid
+  const snappedFrames = selection.map(frame => {
+    const newWidth = Math.ceil(frame.width / gridSize) * gridSize;
+    const newHeight = Math.ceil(frame.height / gridSize) * gridSize;
+    return { width: newWidth, height: newHeight };
+  });
+
+  // Calculate total width and arrange frames
+  let currentX = 0;
+  let currentY = 0;
+  let rowHeight = 0;
+  let totalWidth = 0;
+  let totalHeight = 0;
+
+  // First calculate the maximum width of all frames
+  const maxFrameWidth = Math.max(...snappedFrames.map(frame => frame.width));
+  
+  // Calculate total width by summing up widths until we exceed viewport width
+  const viewportWidth = figma.viewport.bounds.width * 0.8; // Use 80% of viewport width
+  let currentRowWidth = 0;
+  let maxRowWidth = 0;
+
+  snappedFrames.forEach(frame => {
+    if (currentRowWidth + frame.width > viewportWidth && currentRowWidth > 0) {
+      maxRowWidth = Math.max(maxRowWidth, currentRowWidth);
+      currentRowWidth = frame.width;
+    } else {
+      currentRowWidth += frame.width;
+    }
+  });
+  maxRowWidth = Math.max(maxRowWidth, currentRowWidth);
+  totalWidth = maxRowWidth;
+
+  // Reset for height calculation
+  currentX = 0;
+  currentY = 0;
+  rowHeight = 0;
+
+  // Calculate actual height needed
+  snappedFrames.forEach(frame => {
+    // If this frame would exceed the total width, move to next row
+    if (currentX + frame.width > totalWidth && currentX > 0) {
+      currentX = 0;
+      currentY += rowHeight;
+      rowHeight = 0;
+    }
+    
+    // Update row height if this frame is taller
+    rowHeight = Math.max(rowHeight, frame.height);
+    currentX += frame.width;
+  });
+  totalHeight = currentY + rowHeight;
+
+  // Create new atlas frame with calculated dimensions
+  console.log('📦 Creating atlas frame with dimensions:', { width: totalWidth, height: totalHeight });
+  const atlas = figma.createFrame();
+  atlas.name = 'Sprite Atlas';
+  atlas.resize(totalWidth, totalHeight);
+  
+  // Set up auto-layout
+  console.log('⚙️ Configuring atlas properties...');
+  atlas.layoutMode = 'HORIZONTAL';
+  atlas.primaryAxisAlignItems = 'MIN';
+  atlas.counterAxisAlignItems = 'MIN';
+  atlas.layoutWrap = 'WRAP';
+  atlas.itemSpacing = 0;
+  atlas.counterAxisSpacing = 0;
+  atlas.paddingTop = 0;
+  atlas.paddingBottom = 0;
+  atlas.paddingLeft = 0;
+  atlas.paddingRight = 0;
+  
+  // Position atlas at the center of the viewport
+  const viewport = figma.viewport;
+  atlas.x = viewport.center.x - (totalWidth / 2);
+  atlas.y = viewport.center.y - (totalHeight / 2);
+
+  // Set up pixel grid
+  console.log(`📏 Setting up ${gridSize}x${gridSize} pixel grid...`);
+  const grid = {
+    pattern: 'GRID',
+    sectionSize: gridSize,
+    visible: true,
+    color: { r: 1, g: 0, b: 0, a: 1 }
+  };
+  atlas.layoutGrids = [grid];
+
+  // Add all frames to the atlas
+  console.log('➡️ Adding frames to atlas...');
+  selection.forEach(frame => {
+    atlas.appendChild(frame);
+  });
+
+  // Select the atlas and ensure it's visible in the viewport
+  figma.currentPage.selection = [atlas];
+  
+  // Zoom to a comfortable level (80% of viewport)
+  const padding = 100; // Add padding around the atlas
+  figma.viewport.scrollAndZoomIntoView([atlas]);
+  
+  // Additional zoom adjustment for better visibility
+  const targetZoom = Math.min(
+    (viewport.bounds.width * 0.8) / atlas.width,
+    (viewport.bounds.height * 0.8) / atlas.height
+  );
+  figma.viewport.zoom = targetZoom;
+
+  // Generate JSON data
+  // ... rest of the existing JSON generation code ...
+
+  // Create Phaser texture atlas JSON
+  console.log('📝 Generating Phaser texture atlas JSON...');
+  const frames = {};
+  
+  // Wait for layout to be applied
+  figma.viewport.zoom = 1; // Ensure consistent transform calculations
+  
+  // Iterate through each child in the atlas to build the frames object
+  atlas.children.forEach((child, index) => {
+    console.log(`Processing frame ${index + 1}/${atlas.children.length}: ${child.name}`);
+    
+    // Get absolute positions
+    const childBounds = child.absoluteBoundingBox;
+    const atlasBounds = atlas.absoluteBoundingBox;
+    
+    if (!childBounds || !atlasBounds) {
+      console.warn(`Could not get bounds for frame: ${child.name}`);
+      return;
+    }
+    
+    // Calculate relative position
+    const relativeX = childBounds.x - atlasBounds.x;
+    const relativeY = childBounds.y - atlasBounds.y;
+    
+    console.log(`Frame "${child.name}" position:`, {
+      absolute: { x: childBounds.x, y: childBounds.y },
+      atlas: { x: atlasBounds.x, y: atlasBounds.y },
+      relative: { x: relativeX, y: relativeY }
+    });
+    
+    // Add frame data with extended properties
+    frames[child.name] = {
+      frame: {
+        x: Math.round(relativeX),
+        y: Math.round(relativeY),
+        w: Math.round(child.width),
+        h: Math.round(child.height)
+      },
+      rotated: false,
+      trimmed: false,
+      spriteSourceSize: {
+        x: 0,
+        y: 0,
+        w: Math.round(child.width),
+        h: Math.round(child.height)
+      },
+      sourceSize: {
+        w: Math.round(child.width),
+        h: Math.round(child.height)
+      },
+      pivot: {
+        x: 0.5,
+        y: 0.5
+      }
+    };
+  });
+
+  // Create meta object
+  const meta = {
+    image: "atlas.png",
+    size: {
+      w: Math.round(atlas.width),
+      h: Math.round(atlas.height)
+    },
+    scale: "1"
+  };
+
+  // Create complete atlas JSON
+  const atlasJson = {
+    frames,
+    meta
+  };
+
+  // Send atlas JSON to UI
+  console.log('📤 Sending atlas JSON to UI...');
+  figma.ui.postMessage({
+    type: "export-atlas-json",
+    data: atlasJson
+  });
+
+  // Select the atlas frame
+  figma.currentPage.selection = [atlas];
+  figma.viewport.scrollAndZoomIntoView([atlas]);
+
+  console.log('✅ Atlas created successfully');
+  return {
+    success: true,
+    atlas: {
+      id: atlas.id,
+      name: atlas.name,
+      width: atlas.width,
+      height: atlas.height,
+      gridSize: gridSize,
+      framesCount: selection.length,
+      json: atlasJson // Include JSON in the return value
+    }
+  };
 }

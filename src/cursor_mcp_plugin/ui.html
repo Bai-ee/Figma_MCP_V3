@@ -480,6 +480,24 @@
         background-color: #f44336;
         color: white;
       }
+      .atlas-json-preview::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      
+      .atlas-json-preview::-webkit-scrollbar-track {
+        background: #2e2e2e;
+        border-radius: 4px;
+      }
+      
+      .atlas-json-preview::-webkit-scrollbar-thumb {
+        background: #666;
+        border-radius: 4px;
+      }
+      
+      .atlas-json-preview::-webkit-scrollbar-thumb:hover {
+        background: #888;
+      }
     </style>
   </head>
   <body>
@@ -653,7 +671,12 @@
           <div style="margin: 20px 0; border-bottom: 1px solid #444;"></div>
           
           <h2>Selection Tools</h2>
-          <button id="convertToFrame" class="button">Convert to Frame</button>
+          <div class="form-group">
+            <label for="selectionGridSize">Grid Size (px, must be divisible by 2):</label>
+            <input type="number" id="selectionGridSize" value="32" min="2" step="2">
+          </div>
+          <button id="convertToFrame" class="button">Convert to Sprite Frame</button>
+          <button id="createAtlas" class="button">Create Atlas</button>
           <div style="margin: 20px 0; border-bottom: 1px solid #444;"></div>
           <h2>Tile Generator</h2>
           <div class="form-group">
@@ -1483,6 +1506,50 @@
             // Forward progress update to server
             sendProgressUpdateToServer(message);
             break;
+          case "export-atlas-json":
+            console.log('Received atlas JSON:', message.data);
+            
+            // Create a container for the atlas JSON preview
+            const container = document.createElement('div');
+            container.className = 'atlas-json-preview';
+            container.style.cssText = `
+              background: #1e1e1e;
+              color: #d4d4d4;
+              padding: 16px;
+              border-radius: 8px;
+              margin: 16px 0;
+              font-family: monospace;
+              white-space: pre-wrap;
+              max-height: 300px;
+              overflow-y: auto;
+            `;
+            
+            // Add the JSON preview
+            container.textContent = JSON.stringify(message.data, null, 2);
+            
+            // Create download button
+            const downloadBtn = document.createElement('button');
+            downloadBtn.textContent = 'Download phaser-atlas.json';
+            downloadBtn.className = 'button button--primary';
+            downloadBtn.style.marginTop = '8px';
+            downloadBtn.onclick = () => {
+              const jsonBlob = new Blob([JSON.stringify(message.data, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(jsonBlob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'phaser-atlas.json';
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            };
+            
+            // Add elements to the page
+            const resultsDiv = document.getElementById('results') || document.body;
+            resultsDiv.innerHTML = ''; // Clear previous results
+            resultsDiv.appendChild(container);
+            resultsDiv.appendChild(downloadBtn);
+            break;
         }
       };
 
@@ -1608,8 +1675,8 @@
                 pluginMessage: {
                 type: 'export-selection',
                 format: 'ZIP'
-                }
-              }, '*');
+              }
+            }, '*');
           };
         }
 
@@ -1799,11 +1866,11 @@
             }
             
             addLogEntry('Creating centered tile...', 'info');
-            parent.postMessage({ 
-              pluginMessage: { 
-                type: 'execute-command',
+              parent.postMessage({
+                pluginMessage: {
+                  type: 'execute-command',
                 command: 'create_frame',
-                params: {
+                  params: {
                   x: 0,
                   y: 0,
                   width: tileSize,
@@ -1812,9 +1879,9 @@
                   layoutMode: 'VERTICAL',
                   primaryAxisAlignItems: 'CENTER',
                   counterAxisAlignItems: 'CENTER'
+                  }
                 }
-              }
-            }, '*');
+              }, '*');
           };
         }
 
@@ -1870,6 +1937,24 @@
           };
         }
 
+        // Add Create Atlas button handler
+        const createAtlasBtn = document.getElementById('createAtlas');
+        if (createAtlasBtn) {
+          createAtlasBtn.onclick = () => {
+            const gridSize = parseInt(document.getElementById('selectionGridSize').value);
+            addLogEntry('Creating atlas from selected frames...', 'info');
+            parent.postMessage({ 
+              pluginMessage: { 
+                type: 'execute-command',
+                command: 'create_atlas',
+                params: {
+                  gridSize
+                }
+              }
+            }, '*');
+          };
+        }
+
         if (generateTilesBtn) {
           generateTilesBtn.onclick = () => {
             const columns = parseInt(document.getElementById('columns').value);
@@ -1902,15 +1987,15 @@
               if (msg.success) {
                 addLogEntry('Grid frame created successfully!', 'success');
                 addLogEntry(`Frame size: ${msg.frame.width}x${msg.frame.height}, Grid size: ${msg.frame.gridSize}px`, 'info');
-              } else {
+                  } else {
                 addLogEntry(`Error creating grid frame: ${msg.error}`, 'error');
-              }
+                  }
               break;
 
             case 'snap-to-grid-complete':
               if (msg.success) {
                 addLogEntry(`Snapped ${msg.snappedCount} elements to grid`, 'success');
-              } else {
+                } else {
                 addLogEntry(`Error snapping to grid: ${msg.error}`, 'error');
               }
               break;
