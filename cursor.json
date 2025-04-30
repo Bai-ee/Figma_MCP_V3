@@ -184,6 +184,75 @@
         "sharedState": "Use a central dispatcher or messaging pattern to pass context if needed"
       }
     },
+    "mapsAndSprites": {
+      "enforced": true,
+      "rules": [
+        "Only use Figma Plugin API for all operations",
+        "Work exclusively within @cursor_mcp_plugin directory",
+        "Follow modular structure defined in this config",
+        "Implement comprehensive error handling and logging",
+        "Keep UI and plugin code strictly separated",
+        "Use prescribed communication patterns"
+      ],
+      "features": {
+        "tileMap": {
+          "operations": ["create", "export", "modify"],
+          "requirements": {
+            "gridSystem": "Must use Figma's coordinate system",
+            "validation": "Validate all input parameters",
+            "errorHandling": "Provide detailed error messages"
+          }
+        },
+        "sprites": {
+          "operations": ["create", "export", "organize"],
+          "requirements": {
+            "naming": "Use consistent naming convention",
+            "structure": "Maintain frame hierarchy",
+            "export": "Support multiple formats"
+          }
+        },
+        "grid": {
+          "operations": ["create", "snap", "align"],
+          "requirements": {
+            "precision": "Use pixel-perfect alignment",
+            "performance": "Optimize for large selections"
+          }
+        }
+      },
+      "logging": {
+        "required": true,
+        "format": {
+          "success": "✅ [Operation] - Details",
+          "error": "❌ [Operation] - Error details",
+          "info": "ℹ️ [Operation] - Progress update"
+        }
+      },
+      "communication": {
+        "pattern": "postMessage",
+        "format": {
+          "toPlugin": {
+            "type": "execute-command",
+            "command": "string",
+            "params": "object"
+          },
+          "fromPlugin": {
+            "type": "command-result",
+            "success": "boolean",
+            "data": "object",
+            "error": "string?"
+          }
+        }
+      },
+      "errorHandling": {
+        "required": true,
+        "pattern": {
+          "try": "Wrap all Figma API calls",
+          "catch": "Provide specific error messages",
+          "logging": "Log all errors with stack traces",
+          "userFeedback": "Show user-friendly error messages"
+        }
+      }
+    },
     "notes": [
       "MCP infrastructure is working. This file MUST NOT interfere with it.",
       "Only use Figma Plugin API in plugins/figma-plugin-* directories.",

@@ -223,6 +223,9 @@ figma.ui.onmessage = async (msg) => {
     case 'analyze-layers':
       handleAnalyzeLayers();
       break;
+
+    case "log_selection":
+      return logSelectionInfo();
   }
 };
 
@@ -244,162 +247,163 @@ function updateSettings(settings) {
 
 // Handle commands from UI
 async function handleCommand(command, params) {
-  console.log('Handling command:', command, 'with params:', params);
-
-  try {
-    switch (command) {
-      case "get_document_info":
-        return await getDocumentInfo();
-      case "get_selection":
-        return await getSelection();
-      case "get_node_info":
-        if (!params || !params.nodeId) {
-          throw new Error("Missing nodeId parameter");
-        }
-        return await getNodeInfo(params.nodeId);
-      case "get_nodes_info":
-        if (!params || !params.nodeIds || !Array.isArray(params.nodeIds)) {
-          throw new Error("Missing or invalid nodeIds parameter");
-        }
-        return await getNodesInfo(params.nodeIds);
-      case "read_my_design":
-        return await readMyDesign();
-      case "create_rectangle":
-        return await createRectangle(params);
-      case "create_frame":
-        return await createFrame(params);
-      case "create_text":
-        return await createText(params);
-      case "set_fill_color":
-        return await setFillColor(params);
-      case "set_stroke_color":
-        return await setStrokeColor(params);
-      case "move_node":
-        return await moveNode(params);
-      case "resize_node":
-        return await resizeNode(params);
-      case "delete_node":
-        return await deleteNode(params);
-      case "delete_multiple_nodes":
-        return await deleteMultipleNodes(params);
-      case "get_styles":
-        return await getStyles();
-      case "get_local_components":
-        return await getLocalComponents();
-      case "create_component_instance":
-        return await createComponentInstance(params);
-      case "export_node_as_image":
-        try {
-          const { nodeId, format = 'PNG', scale = 2 } = params;
-          console.log(`Exporting node ${nodeId} as ${format} with scale ${scale}`);
-          
-          const node = figma.getNodeById(nodeId);
-          if (!node) {
-            throw new Error('Node not found');
-          }
-
-          const settings = {
-            format: format,
-            constraint: { type: 'SCALE', value: scale }
-          };
-
-          const bytes = await node.exportAsync(settings);
-          console.log('Export successful, size:', bytes.length, 'bytes');
-          
-          sendCommandResult('export_node_as_image', { success: true });
-        } catch (error) {
-          console.error('Export failed:', error);
-          sendCommandResult('export_node_as_image', { 
-            success: false, 
-            error: error.message 
-          });
-        }
-        break;
-      case "set_corner_radius":
-        return await setCornerRadius(params);
-      case "set_text_content":
-        return await setTextContent(params);
-      case "clone_node":
-        return await cloneNode(params);
-      case "scan_text_nodes":
-        return await scanTextNodes(params);
-      case "set_multiple_text_contents":
-        return await setMultipleTextContents(params);
-      case "get_annotations":
-        return await getAnnotations(params);
-      case "set_annotation":
-        return await setAnnotation(params);
-      case "scan_nodes_by_types":
-        return await scanNodesByTypes(params);
-      case "set_multiple_annotations":
-        return await setMultipleAnnotations(params);
-      case "set_layout_mode":
-        return await setLayoutMode(params);
-      case "set_padding":
-        return await setPadding(params);
-      case "set_axis_align":
-        return await setAxisAlign(params);
-      case "set_layout_sizing":
-        return await setLayoutSizing(params);
-      case "set_item_spacing":
-        return await setItemSpacing(params);
-      case "analyze_selection":
-        return await analyzeSelection();
-      case "convert_to_frame":
-        return await convertToFrame(params);
-      case "create_atlas":
-        return await createAtlas(params);
-      case "create_grid_frame":
-        return await createGridFrame(params);
-      case "snap_to_grid":
-        return await snapToGrid(params);
-      case "export_phaser_map":
-        return await exportPhaserMap(params);
-      case "generate-tiles":
-        const { tileWidth, tileHeight, columns, rows, spacing } = params;
-        const frame = figma.createFrame();
-        frame.name = 'Tile Grid';
-        frame.layoutMode = 'HORIZONTAL';
-        frame.counterAxisSizingMode = 'AUTO';
-        frame.primaryAxisSizingMode = 'AUTO';
-        frame.layoutWrap = 'WRAP';
-        frame.itemSpacing = spacing;
-        frame.counterAxisSpacing = spacing;
-
-        // Generate tiles
-        for (let row = 0; row < rows; row++) {
-          for (let col = 0; col < columns; col++) {
-            const tile = figma.createRectangle();
-            tile.name = `Tile ${row + 1}-${col + 1}`;
-            tile.resize(tileWidth, tileHeight);
-            frame.appendChild(tile);
-          }
+  console.log("Handling command:", command, "with params:", params);
+  
+  switch (command) {
+    case "get_document_info":
+      return await getDocumentInfo();
+    case "get_selection":
+      return await getSelection();
+    case "get_node_info":
+      if (!params || !params.nodeId) {
+        throw new Error("Missing nodeId parameter");
+      }
+      return await getNodeInfo(params.nodeId);
+    case "get_nodes_info":
+      if (!params || !params.nodeIds || !Array.isArray(params.nodeIds)) {
+        throw new Error("Missing or invalid nodeIds parameter");
+      }
+      return await getNodesInfo(params.nodeIds);
+    case "read_my_design":
+      return await readMyDesign();
+    case "create_rectangle":
+      return await createRectangle(params);
+    case "create_frame":
+      return await createFrame(params);
+    case "create_text":
+      return await createText(params);
+    case "set_fill_color":
+      return await setFillColor(params);
+    case "set_stroke_color":
+      return await setStrokeColor(params);
+    case "move_node":
+      return await moveNode(params);
+    case "resize_node":
+      return await resizeNode(params);
+    case "delete_node":
+      return await deleteNode(params);
+    case "delete_multiple_nodes":
+      return await deleteMultipleNodes(params);
+    case "get_styles":
+      return await getStyles();
+    case "get_local_components":
+      return await getLocalComponents();
+    case "create_component_instance":
+      return await createComponentInstance(params);
+    case "export_node_as_image":
+      try {
+        const { nodeId, format = 'PNG', scale = 2 } = params;
+        console.log(`Exporting node ${nodeId} as ${format} with scale ${scale}`);
+        
+        const node = figma.getNodeById(nodeId);
+        if (!node) {
+          throw new Error('Node not found');
         }
 
-        // Position the frame in the center of the viewport
-        const { x, y } = figma.viewport.center;
-        frame.x = x - (frame.width / 2);
-        frame.y = y - (frame.height / 2);
-
-        // Select the frame and zoom to it
-        figma.currentPage.selection = [frame];
-        figma.viewport.scrollAndZoomIntoView([frame]);
-
-        return {
-          success: true,
-          frame: {
-            id: frame.id,
-            name: frame.name,
-            width: frame.width,
-            height: frame.height
-          }
+        const settings = {
+          format: format,
+          constraint: { type: 'SCALE', value: scale }
         };
-      default:
-        throw new Error(`Unknown command: ${command}`);
-    }
-  } catch (error) {
-    console.error('Command failed:', error);
-    throw error;
+
+        const bytes = await node.exportAsync(settings);
+        console.log('Export successful, size:', bytes.length, 'bytes');
+        
+        sendCommandResult('export_node_as_image', { success: true });
+      } catch (error) {
+        console.error('Export failed:', error);
+        sendCommandResult('export_node_as_image', { 
+          success: false, 
+          error: error.message 
+        });
+      }
+      break;
+    case "set_corner_radius":
+      return await setCornerRadius(params);
+    case "set_text_content":
+      return await setTextContent(params);
+    case "clone_node":
+      return await cloneNode(params);
+    case "scan_text_nodes":
+      return await scanTextNodes(params);
+    case "set_multiple_text_contents":
+      return await setMultipleTextContents(params);
+    case "get_annotations":
+      return await getAnnotations(params);
+    case "set_annotation":
+      return await setAnnotation(params);
+    case "scan_nodes_by_types":
+      return await scanNodesByTypes(params);
+    case "set_multiple_annotations":
+      return await setMultipleAnnotations(params);
+    case "set_layout_mode":
+      return await setLayoutMode(params);
+    case "set_padding":
+      return await setPadding(params);
+    case "set_axis_align":
+      return await setAxisAlign(params);
+    case "set_layout_sizing":
+      return await setLayoutSizing(params);
+    case "set_item_spacing":
+      return await setItemSpacing(params);
+    case "analyze_selection":
+      return await analyzeSelection();
+    case "convert_to_frame":
+      return await convertToFrame(params);
+    case "create_atlas":
+      return await createAtlas(params);
+    case "create_grid_frame":
+      return await createGridFrame(params);
+    case "snap_to_grid":
+      return await snapToGrid(params);
+    case "export_phaser_map":
+      return await exportPhaserMap(params);
+    case "generate-tiles":
+      const { tileWidth, tileHeight, columns, rows, spacing } = params;
+      const frame = figma.createFrame();
+      frame.name = 'Tile Grid';
+      frame.layoutMode = 'HORIZONTAL';
+      frame.counterAxisSizingMode = 'AUTO';
+      frame.primaryAxisSizingMode = 'AUTO';
+      frame.layoutWrap = 'WRAP';
+      frame.itemSpacing = spacing;
+      frame.counterAxisSpacing = spacing;
+
+      // Generate tiles
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < columns; col++) {
+          const tile = figma.createRectangle();
+          tile.name = `Tile ${row + 1}-${col + 1}`;
+          tile.resize(tileWidth, tileHeight);
+          frame.appendChild(tile);
+        }
+      }
+
+      // Position the frame in the center of the viewport
+      const { x, y } = figma.viewport.center;
+      frame.x = x - (frame.width / 2);
+      frame.y = y - (frame.height / 2);
+
+      // Select the frame and zoom to it
+      figma.currentPage.selection = [frame];
+      figma.viewport.scrollAndZoomIntoView([frame]);
+
+      return {
+        success: true,
+        frame: {
+          id: frame.id,
+          name: frame.name,
+          width: frame.width,
+          height: frame.height
+        }
+      };
+    case "convert_to_basic_frame":
+      return await convertToBasicFrame(params);
+    case "frame-up":
+      return await frameUp();
+    case "export-tile-map":
+      return await exportTileMap(params);
+    default:
+      throw new Error(`Unknown command: ${command}`);
   }
 }
 
@@ -1221,15 +1225,18 @@ async function setTextContent(params) {
       }
     }
 
-    // Send initial settings to UI
-    figma.ui.postMessage({
-      type: "init-settings",
-      settings: {
-        serverPort: state.serverPort,
-      },
+    // Set up selection change listener
+    figma.on('selectionchange', () => {
+      logSelectionInfo();
     });
+
+    // Log initial selection if any
+    if (figma.currentPage.selection.length > 0) {
+      logSelectionInfo();
+    }
+
   } catch (error) {
-    console.error("Error loading settings:", error);
+    console.error('Error initializing plugin:', error);
   }
 })();
 
@@ -3639,82 +3646,83 @@ async function createAtlas(params = {}) {
 
   const gridSize = params.gridSize || 8;
   
-  // First pass: snap all frame dimensions to grid
-  const snappedFrames = selection.map(frame => {
-    const newWidth = Math.ceil(frame.width / gridSize) * gridSize;
-    const newHeight = Math.ceil(frame.height / gridSize) * gridSize;
-    return { width: newWidth, height: newHeight };
-  });
+  // First pass: snap all frame dimensions to grid and create frame objects
+  const frames = selection.map(frame => ({
+    node: frame,
+    width: Math.ceil(frame.width / gridSize) * gridSize,
+    height: Math.ceil(frame.height / gridSize) * gridSize,
+    x: 0,
+    y: 0,
+    placed: false
+  }));
 
-  // Calculate total width and arrange frames
-  let currentX = 0;
-  let currentY = 0;
-  let rowHeight = 0;
-  let totalWidth = 0;
-  let totalHeight = 0;
+  // Sort frames by height descending for better packing
+  frames.sort((a, b) => b.height - a.height);
 
-  // First calculate the maximum width of all frames
-  const maxFrameWidth = Math.max(...snappedFrames.map(frame => frame.width));
-  
-  // Calculate total width by summing up widths until we exceed viewport width
-  const viewportWidth = figma.viewport.bounds.width * 0.8; // Use 80% of viewport width
-  let currentRowWidth = 0;
-  let maxRowWidth = 0;
+  // Initialize atlas dimensions with reasonable starting size
+  let atlasWidth = Math.ceil(Math.sqrt(frames.reduce((sum, frame) => sum + frame.width * frame.height, 0)) * 1.1);
+  let atlasHeight = 0;
+  let needsRepack = true;
 
-  snappedFrames.forEach(frame => {
-    if (currentRowWidth + frame.width > viewportWidth && currentRowWidth > 0) {
-      maxRowWidth = Math.max(maxRowWidth, currentRowWidth);
-      currentRowWidth = frame.width;
-    } else {
-      currentRowWidth += frame.width;
+  while (needsRepack) {
+    // Reset placement flags
+    frames.forEach(frame => frame.placed = false);
+    atlasHeight = 0;
+    needsRepack = false;
+
+    // Try to place each frame
+    for (const frame of frames) {
+      let placed = false;
+      let bestY = Infinity;
+      let bestX = 0;
+
+      // Find the best position for this frame
+      for (let y = 0; y <= atlasHeight; y += gridSize) {
+        xLoop: for (let x = 0; x <= atlasWidth - frame.width; x += gridSize) {
+          // Check if this position overlaps with any placed frames
+          for (const placedFrame of frames.filter(f => f.placed)) {
+            if (!(x + frame.width <= placedFrame.x || x >= placedFrame.x + placedFrame.width ||
+                  y + frame.height <= placedFrame.y || y >= placedFrame.y + placedFrame.height)) {
+              continue xLoop;
+            }
+          }
+
+          // Valid position found
+          if (y < bestY) {
+            bestY = y;
+            bestX = x;
+            placed = true;
+          }
+        }
+      }
+
+      if (placed) {
+        frame.x = bestX;
+        frame.y = bestY;
+        frame.placed = true;
+        atlasHeight = Math.max(atlasHeight, bestY + frame.height);
+      } else {
+        // Couldn't place frame, need to increase atlas width and try again
+        atlasWidth = Math.ceil(atlasWidth * 1.2);
+        needsRepack = true;
+        break;
+      }
     }
-  });
-  maxRowWidth = Math.max(maxRowWidth, currentRowWidth);
-  totalWidth = maxRowWidth;
-
-  // Reset for height calculation
-  currentX = 0;
-  currentY = 0;
-  rowHeight = 0;
-
-  // Calculate actual height needed
-  snappedFrames.forEach(frame => {
-    // If this frame would exceed the total width, move to next row
-    if (currentX + frame.width > totalWidth && currentX > 0) {
-      currentX = 0;
-      currentY += rowHeight;
-      rowHeight = 0;
-    }
-    
-    // Update row height if this frame is taller
-    rowHeight = Math.max(rowHeight, frame.height);
-    currentX += frame.width;
-  });
-  totalHeight = currentY + rowHeight;
+  }
 
   // Create new atlas frame with calculated dimensions
-  console.log('📦 Creating atlas frame with dimensions:', { width: totalWidth, height: totalHeight });
+  console.log('📦 Creating atlas frame with dimensions:', { width: atlasWidth, height: atlasHeight });
   const atlas = figma.createFrame();
   atlas.name = 'Sprite Atlas';
-  atlas.resize(totalWidth, totalHeight);
+  atlas.resize(atlasWidth, atlasHeight);
   
-  // Set up auto-layout
-  console.log('⚙️ Configuring atlas properties...');
-  atlas.layoutMode = 'HORIZONTAL';
-  atlas.primaryAxisAlignItems = 'MIN';
-  atlas.counterAxisAlignItems = 'MIN';
-  atlas.layoutWrap = 'WRAP';
-  atlas.itemSpacing = 0;
-  atlas.counterAxisSpacing = 0;
-  atlas.paddingTop = 0;
-  atlas.paddingBottom = 0;
-  atlas.paddingLeft = 0;
-  atlas.paddingRight = 0;
+  // Disable auto-layout for precise positioning
+  atlas.layoutMode = 'NONE';
   
   // Position atlas at the center of the viewport
   const viewport = figma.viewport;
-  atlas.x = viewport.center.x - (totalWidth / 2);
-  atlas.y = viewport.center.y - (totalHeight / 2);
+  atlas.x = viewport.center.x - (atlasWidth / 2);
+  atlas.y = viewport.center.y - (atlasHeight / 2);
 
   // Set up pixel grid
   console.log(`📏 Setting up ${gridSize}x${gridSize} pixel grid...`);
@@ -3726,112 +3734,78 @@ async function createAtlas(params = {}) {
   };
   atlas.layoutGrids = [grid];
 
-  // Add all frames to the atlas
+  // Add all frames to the atlas at their calculated positions
   console.log('➡️ Adding frames to atlas...');
-  selection.forEach(frame => {
-    atlas.appendChild(frame);
+  frames.forEach(frame => {
+    atlas.appendChild(frame.node);
+    frame.node.x = frame.x;
+    frame.node.y = frame.y;
   });
 
   // Select the atlas and ensure it's visible in the viewport
   figma.currentPage.selection = [atlas];
-  
-  // Zoom to a comfortable level (80% of viewport)
-  const padding = 100; // Add padding around the atlas
   figma.viewport.scrollAndZoomIntoView([atlas]);
-  
-  // Additional zoom adjustment for better visibility
-  const targetZoom = Math.min(
-    (viewport.bounds.width * 0.8) / atlas.width,
-    (viewport.bounds.height * 0.8) / atlas.height
-  );
-  figma.viewport.zoom = targetZoom;
 
-  // Generate JSON data
-  // ... rest of the existing JSON generation code ...
-
-  // Create Phaser texture atlas JSON
-  console.log('📝 Generating Phaser texture atlas JSON...');
-  const frames = {};
-  
-  // Wait for layout to be applied
-  figma.viewport.zoom = 1; // Ensure consistent transform calculations
-  
-  // Iterate through each child in the atlas to build the frames object
-  atlas.children.forEach((child, index) => {
-    console.log(`Processing frame ${index + 1}/${atlas.children.length}: ${child.name}`);
-    
-    // Get absolute positions
-    const childBounds = child.absoluteBoundingBox;
-    const atlasBounds = atlas.absoluteBoundingBox;
-    
-    if (!childBounds || !atlasBounds) {
-      console.warn(`Could not get bounds for frame: ${child.name}`);
-      return;
-    }
-    
-    // Calculate relative position
-    const relativeX = childBounds.x - atlasBounds.x;
-    const relativeY = childBounds.y - atlasBounds.y;
-    
-    console.log(`Frame "${child.name}" position:`, {
-      absolute: { x: childBounds.x, y: childBounds.y },
-      atlas: { x: atlasBounds.x, y: atlasBounds.y },
-      relative: { x: relativeX, y: relativeY }
-    });
-    
-    // Add frame data with extended properties
-    frames[child.name] = {
-      frame: {
-        x: Math.round(relativeX),
-        y: Math.round(relativeY),
-        w: Math.round(child.width),
-        h: Math.round(child.height)
-      },
-      rotated: false,
-      trimmed: false,
-      spriteSourceSize: {
-        x: 0,
-        y: 0,
-        w: Math.round(child.width),
-        h: Math.round(child.height)
-      },
-      sourceSize: {
-        w: Math.round(child.width),
-        h: Math.round(child.height)
-      },
-      pivot: {
-        x: 0.5,
-        y: 0.5
-      }
-    };
-  });
-
-  // Create meta object
-  const meta = {
-    image: "atlas.png",
-    size: {
-      w: Math.round(atlas.width),
-      h: Math.round(atlas.height)
+  // Build frames array for JSON
+  const framesArr = frames.map((frame) => ({
+    filename: `${frame.node.name}.png`,
+    rotated: false,
+    trimmed: false,
+    sourceSize: {
+      w: Math.round(frame.width),
+      h: Math.round(frame.height)
     },
-    scale: "1"
+    spriteSourceSize: {
+      x: 0,
+      y: 0,
+      w: Math.round(frame.width),
+      h: Math.round(frame.height)
+    },
+    frame: {
+      x: Math.round(frame.x),
+      y: Math.round(frame.y),
+      w: Math.round(frame.width),
+      h: Math.round(frame.height)
+    }
+  }));
+
+  // Texture object
+  const textureObj = {
+    image: "atlas.png",
+    format: "RGBA8888",
+    size: {
+      w: Math.round(atlasWidth),
+      h: Math.round(atlasHeight)
+    },
+    scale: 1,
+    frames: framesArr
   };
 
-  // Create complete atlas JSON
+  // Meta object
+  const metaObj = {
+    app: "http://free-tex-packer.com",
+    version: "0.6.5"
+  };
+
+  // Final JSON
   const atlasJson = {
-    frames,
-    meta
+    textures: [textureObj],
+    meta: metaObj
   };
 
-  // Send atlas JSON to UI
+  // Format JSON with 2-space indentation
+  const formattedJson = JSON.stringify(atlasJson, null, 2);
+  
+  // Log the formatted JSON to console
+  console.log('Atlas JSON Data:');
+  console.log(formattedJson);
+
+  // Send to UI
   console.log('📤 Sending atlas JSON to UI...');
   figma.ui.postMessage({
     type: "export-atlas-json",
     data: atlasJson
   });
-
-  // Select the atlas frame
-  figma.currentPage.selection = [atlas];
-  figma.viewport.scrollAndZoomIntoView([atlas]);
 
   console.log('✅ Atlas created successfully');
   return {
@@ -3839,11 +3813,336 @@ async function createAtlas(params = {}) {
     atlas: {
       id: atlas.id,
       name: atlas.name,
-      width: atlas.width,
-      height: atlas.height,
+      width: atlasWidth,
+      height: atlasHeight,
       gridSize: gridSize,
       framesCount: selection.length,
-      json: atlasJson // Include JSON in the return value
+      json: atlasJson
     }
   };
+}
+
+async function convertToBasicFrame(params = {}) {
+  console.log('🔄 Converting selection to basic frame...', params);
+  
+  // Get current selection
+  const selection = figma.currentPage.selection;
+  console.log(`📝 Current selection: ${selection.length} items`);
+  
+  if (selection.length === 0) {
+    throw new Error('Please select an element first');
+  }
+
+  const node = selection[0];
+  console.log('🔍 Selected node:', {
+    id: node.id,
+    type: node.type,
+    name: node.name,
+    width: node.width,
+    height: node.height
+  });
+
+  // Create new frame
+  console.log('📦 Creating new frame...');
+  const frame = figma.createFrame();
+  frame.name = 'Basic Frame';
+  
+  // Make it square based on the larger dimension
+  const maxSize = Math.max(node.width, node.height);
+  console.log(`📏 Setting frame size to ${maxSize}x${maxSize}`);
+  frame.resize(maxSize, maxSize);
+  
+  // Set up auto-layout for bottom-right alignment
+  frame.layoutMode = 'VERTICAL';
+  frame.primaryAxisAlignItems = 'MAX'; // Align to bottom
+  frame.counterAxisAlignItems = 'MAX'; // Align to right
+  frame.layoutSizingHorizontal = 'FIXED';
+  frame.layoutSizingVertical = 'FIXED';
+  
+  // Position frame at the center of the viewport
+  const viewport = figma.viewport;
+  frame.x = viewport.center.x - (maxSize / 2);
+  frame.y = viewport.center.y - (maxSize / 2);
+  
+  // Move the selected node into the frame
+  console.log('➡️ Moving node into frame...');
+  frame.appendChild(node);
+
+  // Select the new frame and ensure it's visible in the viewport
+  figma.currentPage.selection = [frame];
+  figma.viewport.scrollAndZoomIntoView([frame]);
+
+  console.log('✅ Basic frame conversion complete');
+  return {
+    success: true,
+    frame: {
+      id: frame.id,
+      name: frame.name,
+      width: frame.width,
+      height: frame.height
+    }
+  };
+}
+
+async function frameUp() {
+  const selection = figma.currentPage.selection;
+  
+  if (selection.length === 0) {
+    throw new Error('Please select at least one item');
+  }
+
+  // Store the original parent for insertion order
+  const originalParent = selection[0].parent;
+  const nextSibling = selection[0].nextSibling;
+
+  // Create a frame that will contain all selected items
+  const frame = figma.createFrame();
+  frame.name = "Aspect Frame";
+  
+  // Calculate the bounding box of all selected items
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  
+  selection.forEach(node => {
+    minX = Math.min(minX, node.x);
+    minY = Math.min(minY, node.y);
+    maxX = Math.max(maxX, node.x + node.width);
+    maxY = Math.max(maxY, node.y + node.height);
+  });
+  
+  // Set frame position and size
+  frame.x = minX;
+  frame.y = minY;
+  frame.resize(maxX - minX, maxY - minY);
+  
+  // Set frame properties for hugging content
+  frame.layoutMode = "HORIZONTAL";
+  frame.primaryAxisSizingMode = "AUTO";
+  frame.counterAxisSizingMode = "AUTO";
+  frame.itemSpacing = 0;
+  frame.paddingLeft = 0;
+  frame.paddingRight = 0;
+  frame.paddingTop = 0;
+  frame.paddingBottom = 0;
+  
+  // Move all selected items into the frame and lock their aspect ratios
+  selection.forEach(node => {
+    if (node.type !== 'FRAME') {
+      // Adjust position relative to the new frame
+      node.x = node.x - frame.x;
+      node.y = node.y - frame.y;
+      
+      // Lock aspect ratio if the node supports it
+      if ('constrainProportions' in node) {
+        node.constrainProportions = true;
+      }
+    }
+    
+    // Move the node into the frame
+    frame.appendChild(node);
+  });
+
+  // Insert the frame in the original position in the layer stack
+  if (nextSibling) {
+    originalParent.insertChild(originalParent.children.indexOf(nextSibling), frame);
+  } else {
+    originalParent.appendChild(frame);
+  }
+  
+  // Select the new frame without changing viewport
+  figma.currentPage.selection = [frame];
+  
+  return {
+    success: true,
+    message: 'Created aspect-locked frame successfully'
+  };
+}
+
+// Add the exportTileMap function
+function logStep(step, details = '') {
+  const message = details ? `${step} - ${details}` : step;
+  console.log(message);
+}
+
+async function exportTileMap(params) {
+  logStep('🚀 Starting the export function');
+  const selection = figma.currentPage.selection;
+  
+  if (selection.length !== 1 || selection[0].type !== 'FRAME') {
+    console.error('Please select a single frame to export');
+    return;
+  }
+
+  const selectedFrame = selection[0];
+  logStep('📋 Selected frame', `${selectedFrame.name}`);
+
+  const TILE_SIZE = 32;
+  const WIDTH = Math.ceil(selectedFrame.width / TILE_SIZE);
+  const HEIGHT = Math.ceil(selectedFrame.height / TILE_SIZE);
+
+  // Create empty ground layer data
+  const groundLayerData = new Array(WIDTH * HEIGHT).fill(0);
+
+  // Convert children to collision objects
+  const objects = selectedFrame.children.map((child, index) => {
+    const bounds = child.absoluteBoundingBox;
+    return {
+      id: index + 1,
+      name: child.name || `Object ${index + 1}`,
+      type: "",
+      x: bounds.x - selectedFrame.absoluteBoundingBox.x,
+      y: bounds.y - selectedFrame.absoluteBoundingBox.y,
+      width: bounds.width,
+      height: bounds.height,
+      rotation: 0,
+      visible: true
+    };
+  });
+
+  const mapData = {
+    compressionlevel: -1,
+    height: HEIGHT,
+    width: WIDTH,
+    tilewidth: TILE_SIZE,
+    tileheight: TILE_SIZE,
+    infinite: false,
+    orientation: "orthogonal",
+    renderorder: "right-down",
+    tiledversion: "1.10.1",
+    type: "map",
+    version: "1.10",
+    nextlayerid: 3,
+    nextobjectid: objects.length + 1,
+    layers: [
+      {
+        id: 1,
+        name: "Ground",
+        type: "tilelayer",
+        x: 0,
+        y: 0,
+        width: WIDTH,
+        height: HEIGHT,
+        opacity: 1,
+        visible: true,
+        data: groundLayerData
+      },
+      {
+        id: 2,
+        name: "Collision",
+        type: "objectgroup",
+        draworder: "topdown",
+        x: 0,
+        y: 0,
+        opacity: 1,
+        visible: true,
+        objects: objects
+      }
+    ],
+    tilesets: [
+      {
+        firstgid: 1,
+        name: "tilemap",
+        tilewidth: TILE_SIZE,
+        tileheight: TILE_SIZE,
+        spacing: 0,
+        margin: 0,
+        image: "tileset_test.png",
+        columns: null,
+        tilecount: null
+      }
+    ]
+  };
+
+  // Create a custom replacer function to handle array formatting
+  const customReplacer = (key, value) => {
+    return value;
+  };
+
+  // Create a custom formatter function
+  const customFormatter = (obj, indent = 0) => {
+    const spaces = ' '.repeat(indent);
+    
+    if (Array.isArray(obj)) {
+      // Special handling for data array in tilelayer
+      if (obj === groundLayerData) {
+        return `[${obj.join(',')}]`;
+      }
+      
+      // Format other arrays with items on separate lines
+      const items = obj.map(item => 
+        typeof item === 'object' && item !== null
+          ? `${spaces}  ${JSON.stringify(item, customReplacer, 2).replace(/^/gm, ' '.repeat(indent + 2))}`
+          : `${spaces}  ${JSON.stringify(item)}`
+      ).join(',\n');
+      
+      return `[\n${items}\n${spaces}]`;
+    }
+    
+    if (typeof obj === 'object' && obj !== null) {
+      const entries = Object.entries(obj);
+      const formatted = entries.map(([k, v]) => {
+        const value = typeof v === 'object' && v !== null
+          ? customFormatter(v, indent + 2)
+          : JSON.stringify(v);
+        return `${spaces}  "${k}": ${value}`;
+      }).join(',\n');
+      
+      return `{\n${formatted}\n${spaces}}`;
+    }
+    
+    return JSON.stringify(obj);
+  };
+
+  // Format the map data using custom formatter
+  const formattedJson = customFormatter(mapData);
+
+  // Log the formatted map data
+  console.log('Generated Tile Map Data:');
+  console.log(formattedJson);
+
+  // Return the result
+  return {
+    success: true,
+    mapData: mapData
+  };
+}
+
+// Add selection change listener
+figma.on('selectionchange', () => {
+  logSelectionInfo();
+});
+
+// Function to log selection information
+function logSelectionInfo() {
+  const selection = figma.currentPage.selection;
+
+  console.log('🎯 Selection changed:', {
+    count: selection.length,
+    types: selection.map(node => node.type)
+  });
+
+  // Check if a frame is selected
+  if (selection.length === 1 && selection[0].type === "FRAME") {
+    const frame = selection[0];
+    console.log('📦 Selected frame:', {
+      name: frame.name,
+      id: frame.id,
+      size: `${frame.width}x${frame.height}`
+    });
+
+    // Log children information
+    console.log('🔍 Frame contents:');
+    frame.children.forEach(node => {
+      if ("absoluteBoundingBox" in node) {
+        const { x, y, width, height } = node.absoluteBoundingBox;
+        console.log(`  • ${node.name}:`, {
+          type: node.type,
+          position: `(${Math.round(x)}, ${Math.round(y)})`,
+          size: `${Math.round(width)}x${Math.round(height)}`
+        });
+      }
+    });
+  }
 }

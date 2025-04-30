@@ -299,9 +299,106 @@
       
       .api-key-section {
         margin-bottom: 16px;
-        padding: 16px;
+        padding: 10px;
         background-color: #2d2d2d;
-        border-radius: 8px;
+        border: 1px solid #444444;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 12px;
+        height: 80px;
+        overflow-y: auto;
+      }
+      
+      .api-key-section h2 {
+        color: #e0e0e0;
+        font-size: 12px;
+        font-weight: normal;
+        margin-bottom: 6px;
+        font-family: monospace;
+        padding-left: 4px;
+      }
+      
+      .api-key-input {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 6px;
+        padding: 3px;
+        background-color: #1e1e1e;
+        border-radius: 4px;
+      }
+      
+      .api-key-input input {
+        flex-grow: 1;
+        padding: 3px 6px;
+        border: 1px solid #444444;
+        border-radius: 4px;
+        background-color: #2a2a2a;
+        color: #e0e0e0;
+        font-family: monospace;
+        font-size: 11px;
+      }
+      
+      .api-key-input button {
+        padding: 3px 6px;
+        background-color: #333333;
+        border: 1px solid #444444;
+        border-radius: 4px;
+        color: #cccccc;
+        cursor: pointer;
+        font-size: 10px;
+        transition: background-color 0.2s;
+      }
+      
+      .api-key-input button:hover {
+        background-color: #404040;
+      }
+      
+      .api-key-status {
+        font-size: 11px;
+        padding: 3px 6px;
+        margin: 3px;
+        border-radius: 4px;
+        font-family: monospace;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: #e0e0e0;
+      }
+      
+      .api-key-status.valid {
+        color: #66b3ff;
+      }
+      
+      .api-key-status.valid::before {
+        content: '✓';
+        color: #66b3ff;
+      }
+      
+      .api-key-status::before {
+        display: none;
+      }
+      
+      #save-api-key {
+        margin: 3px;
+        padding: 3px 6px;
+        background-color: #333333;
+        border: 1px solid #444444;
+        border-radius: 4px;
+        color: #e0e0e0;
+        cursor: pointer;
+        font-size: 10px;
+        font-family: monospace;
+        transition: background-color 0.2s;
+      }
+      
+      #save-api-key:hover {
+        background-color: #404040;
+      }
+      
+      #save-api-key:disabled {
+        background-color: #2d2d2d;
+        color: #666666;
+        cursor: not-allowed;
       }
       
       .chat-messages {
@@ -310,41 +407,116 @@
         margin-bottom: 16px;
         padding: 16px;
         background-color: #2d2d2d;
+        border: 1px solid #444444;
         border-radius: 8px;
         min-height: 200px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 14px;
       }
       
       .message {
         margin-bottom: 16px;
-        padding: 8px 12px;
-        border-radius: 8px;
+        padding: 12px;
+        border-radius: 6px;
+        position: relative;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      
+      .message .timestamp {
+        position: absolute;
+        top: 8px;
+        right: 12px;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.5);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      }
+
+      .message .content {
+        margin-top: 16px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: #e0e0e0;
+        line-height: 1.5;
+      }
+
+      .message code {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 13px;
+        color: #cccccc;
       }
       
       .user-message {
         background-color: #1a3147;
-        margin-left: 20px;
+        margin-left: 40px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
       }
       
       .assistant-message {
         background-color: #1a472a;
-        margin-right: 20px;
+        margin-right: 40px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
       }
-      
+
+      .message.loading {
+        opacity: 0.7;
+      }
+
+      .message.loading::after {
+        content: '';
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+        border-top-color: transparent;
+        animation: spin 1s linear infinite;
+        margin-left: 8px;
+      }
+
+      .message.error {
+        background-color: #471a1a;
+        border-color: rgba(255, 99, 99, 0.3);
+      }
+
+      .message pre {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 12px;
+        border-radius: 6px;
+        overflow-x: auto;
+        font-family: monospace;
+        margin: 8px 0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        font-size: 13px;
+        color: #cccccc;
+      }
+
       .chat-input {
         display: flex;
         gap: 8px;
+        margin-top: 8px;
       }
       
       .chat-input textarea {
         flex-grow: 1;
-        padding: 8px;
-        border: 1px solid #444;
-        border-radius: 4px;
+        padding: 12px;
+        border: 1px solid #444444;
+        border-radius: 6px;
         background-color: #2d2d2d;
         color: #e0e0e0;
         resize: none;
         min-height: 40px;
-        font-family: inherit;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      
+      .chat-input textarea:focus {
+        outline: none;
+        border-color: #18a0fb;
+        box-shadow: 0 0 0 2px rgba(24, 160, 251, 0.2);
       }
       
       .chat-input button {
@@ -352,111 +524,55 @@
         background-color: #18a0fb;
         color: white;
         border: none;
-        border-radius: 4px;
+        border-radius: 6px;
         cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: background-color 0.2s;
+      }
+      
+      .chat-input button:hover {
+        background-color: #0d8ee0;
       }
       
       .chat-input button:disabled {
-        background-color: #666;
+        background-color: #333333;
+        color: #666666;
         cursor: not-allowed;
       }
       
       .api-key-input {
         width: 100%;
-        padding: 8px;
+        padding: 12px;
         margin-bottom: 8px;
-        border: 1px solid #444;
-        border-radius: 4px;
+        border: 1px solid #444444;
+        border-radius: 6px;
         background-color: #2d2d2d;
         color: #e0e0e0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 14px;
       }
 
-      /* Chat styles */
-      .chat-container {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-      }
-      .chat-messages {
-        flex: 1;
-        overflow-y: auto;
-        padding: 12px;
-        background-color: #2d2d2d;
-        border: 1px solid #444;
-        border-radius: 4px;
-        margin-bottom: 16px;
-      }
-      .chat-input {
-        display: flex;
-        gap: 8px;
-      }
-      .chat-input textarea {
-        flex: 1;
-        min-height: 60px;
-        resize: vertical;
-        padding: 8px;
-        border: 1px solid #444;
-        border-radius: 4px;
-        background-color: #2d2d2d;
-        color: #e0e0e0;
-        font-family: inherit;
-      }
-      .chat-input button {
-        align-self: flex-end;
-      }
-      .message {
-        margin-bottom: 12px;
-        padding: 8px 12px;
-        border-radius: 4px;
-        max-width: 80%;
-      }
-      .user-message {
-        background-color: #18a0fb33;
-        margin-left: auto;
-      }
-      .assistant-message {
-        background-color: #3d3d3d;
-      }
-      .api-key-section {
-        background-color: #2d2d2d;
-        border: 1px solid #444;
-        border-radius: 4px;
-        padding: 12px;
-        margin-bottom: 16px;
-      }
-      .api-key-section.hidden {
-        display: none;
-      }
-      .api-key-input {
-        position: relative;
-      }
-      .api-key-input input {
-        padding-right: 40px;
-      }
-      .toggle-visibility {
-        position: absolute;
-        right: 8px;
-        top: 50%;
-        transform: translateY(-50%);
-        background: none;
-        border: none;
-        color: #999;
-        cursor: pointer;
-        padding: 4px;
-        margin: 0;
-      }
-      .toggle-visibility:hover {
-        color: #fff;
-      }
       .api-key-status {
         font-size: 12px;
-        margin-top: 4px;
+        margin-top: 8px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       }
+      
       .api-key-status.valid {
         color: #4ade80;
       }
+      
       .api-key-status.invalid {
         color: #ff9999;
+      }
+
+      .api-key-section h2 {
+        color: #cccccc;
+        font-size: 12px;
+        font-weight: 500;
+        margin-bottom: 12px;
+        font-family: monospace;
       }
       .status-message {
         display: none;
@@ -498,10 +614,41 @@
       .atlas-json-preview::-webkit-scrollbar-thumb:hover {
         background: #888;
       }
+      
+      /* Add notification styles */
+      .notification {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-size: 14px;
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      
+      .notification.success {
+        background-color: #1a472a;
+        color: #4ade80;
+      }
+      
+      .notification.error {
+        background-color: #471a1a;
+        color: #ff9999;
+      }
+      
+      .notification.show {
+        opacity: 1;
+      }
     </style>
   </head>
   <body>
     <div class="container">
+      <!-- Add notification container -->
+      <div id="notification" class="notification"></div>
+      
       <div class="header">
         <!-- <div class="header-logo">
           <img
@@ -516,10 +663,10 @@
       </div>
 
       <div class="tabs">
-        <div id="tab-connection" class="tab active">MCP</div>
         <div id="tab-tools" class="tab">Tools</div>
         <div id="tab-tile" class="tab"> Map & Sprites</div>
         <div id="tab-about" class="tab">Chat</div>
+        <div id="tab-connection" class="tab active">MCP</div>
       </div>
 
       <div id="status" class="status-message"></div>
@@ -566,7 +713,11 @@
 
       <div id="content-tools" class="tab-content">
         <div class="section">
-          <div class="log-container" id="tools-log"></div>
+          <h2>Frame Tools</h2>
+          <div class="tool-group">
+            <button id="frame-up-btn" class="secondary">Frame Up</button>
+          </div>
+          <div id="tools-log" class="log-container"></div>
           
           <h2>Analyze</h2>
           <div class="tool-group">
@@ -675,8 +826,10 @@
             <label for="selectionGridSize">Grid Size (px, must be divisible by 2):</label>
             <input type="number" id="selectionGridSize" value="32" min="2" step="2">
           </div>
-          <button id="convertToFrame" class="button">Convert to Sprite Frame</button>
+          <button id="convertToFrame" class="button">Convert to Frame</button>
+          <button id="convertToSpriteFrame" class="button">Convert to Sprite Frame</button>
           <button id="createAtlas" class="button">Create Atlas</button>
+          <button id="exportTileMap" class="button">Export Tile Map</button>
           <div style="margin: 20px 0; border-bottom: 1px solid #444;"></div>
           <h2>Tile Generator</h2>
           <div class="form-group">
@@ -707,7 +860,10 @@
             margin-bottom: 16px;
             padding: 16px;
             background-color: #2d2d2d;
+            border: 1px solid #444444;
             border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
           }
           
           .chat-messages {
@@ -716,41 +872,116 @@
             margin-bottom: 16px;
             padding: 16px;
             background-color: #2d2d2d;
+            border: 1px solid #444444;
             border-radius: 8px;
             min-height: 200px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 14px;
           }
           
           .message {
             margin-bottom: 16px;
-            padding: 8px 12px;
-            border-radius: 8px;
+            padding: 12px;
+            border-radius: 6px;
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+          }
+          
+          .message .timestamp {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          }
+
+          .message .content {
+            margin-top: 16px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: #e0e0e0;
+            line-height: 1.5;
+          }
+
+          .message code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #cccccc;
           }
           
           .user-message {
             background-color: #1a3147;
-            margin-left: 20px;
+            margin-left: 40px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
           }
           
           .assistant-message {
             background-color: #1a472a;
-            margin-right: 20px;
+            margin-right: 40px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
           }
-          
+
+          .message.loading {
+            opacity: 0.7;
+          }
+
+          .message.loading::after {
+            content: '';
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            margin-left: 8px;
+          }
+
+          .message.error {
+            background-color: #471a1a;
+            border-color: rgba(255, 99, 99, 0.3);
+          }
+
+          .message pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: monospace;
+            margin: 8px 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 13px;
+            color: #cccccc;
+          }
+
           .chat-input {
             display: flex;
             gap: 8px;
+            margin-top: 8px;
           }
           
           .chat-input textarea {
             flex-grow: 1;
-            padding: 8px;
-            border: 1px solid #444;
-            border-radius: 4px;
+            padding: 12px;
+            border: 1px solid #444444;
+            border-radius: 6px;
             background-color: #2d2d2d;
             color: #e0e0e0;
             resize: none;
             min-height: 40px;
-            font-family: inherit;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+          }
+          
+          .chat-input textarea:focus {
+            outline: none;
+            border-color: #18a0fb;
+            box-shadow: 0 0 0 2px rgba(24, 160, 251, 0.2);
           }
           
           .chat-input button {
@@ -758,51 +989,92 @@
             background-color: #18a0fb;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+          }
+          
+          .chat-input button:hover {
+            background-color: #0d8ee0;
           }
           
           .chat-input button:disabled {
-            background-color: #666;
+            background-color: #333333;
+            color: #666666;
             cursor: not-allowed;
           }
           
           .api-key-input {
             width: 100%;
-            padding: 8px;
+            padding: 12px;
             margin-bottom: 8px;
-            border: 1px solid #444;
-            border-radius: 4px;
+            border: 1px solid #444444;
+            border-radius: 6px;
             background-color: #2d2d2d;
             color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 14px;
+          }
+
+          .api-key-status {
+            font-size: 12px;
+            margin-top: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          }
+          
+          .api-key-status.valid {
+            color: #4ade80;
+          }
+          
+          .api-key-status.invalid {
+            color: #ff9999;
+          }
+
+          .api-key-section h2 {
+            color: #cccccc;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 12px;
+            font-family: monospace;
           }
         </style>
 
         <div class="chat-container">
           <div class="api-key-section" id="api-key-section">
-            <h2>OpenAI API Key</h2>
+            <h2>OpenAI API Key Configuration</h2>
             <div class="api-key-input">
               <input 
                 type="password" 
                 id="openai-key" 
-                placeholder="Enter your OpenAI API key"
+                placeholder="Enter your OpenAI API key (sk-...)"
+                spellcheck="false"
               />
-              <button class="toggle-visibility" id="toggle-key-visibility">👁️</button>
-        </div>
-            <div class="api-key-status" id="api-key-status"></div>
+              <button id="toggle-key-visibility" title="Toggle visibility">👁️</button>
+            </div>
+            <div class="api-key-status" id="api-key-status">Waiting for API key...</div>
             <button id="save-api-key">Save API Key</button>
           </div>
 
           <div class="chat-messages" id="chat-messages">
             <div class="message assistant-message">
-              Hello! I'm your Figma design assistant. How can I help you today?
+              <div class="timestamp">Now</div>
+              <div class="content">Hello! I'm your Figma design assistant. I can help you with:
+• Design analysis and suggestions
+• Component organization
+• Layout improvements
+• Best practices
+• And more!
+
+What would you like help with today?</div>
             </div>
           </div>
 
           <div class="chat-input">
             <textarea 
               id="chat-input" 
-              placeholder="Type your message here..." 
+              placeholder="Type your message here... (Shift+Enter for new line)" 
               rows="2"
             ></textarea>
             <button id="send-message" disabled>Send</button>
@@ -881,29 +1153,7 @@
           apiKeyInput.addEventListener('input', () => {
             updateApiKeyStatus(apiKeyInput.value);
           });
-          
-          // Handle message sending
-          function sendMessage() {
-            const message = chatInput.value.trim();
-            if (!message) return;
-            
-            // Add user message to chat
-            addMessage(message, 'user');
-            chatInput.value = '';
-            
-            // Send to OpenAI
-            parent.postMessage({ 
-              pluginMessage: { 
-                type: 'chat-message',
-                message: message
-              }
-            }, '*');
-            
-            // Disable input while waiting for response
-            chatInput.disabled = true;
-            sendMessageButton.disabled = true;
-          }
-          
+
           // Send message on button click or Enter (Shift+Enter for new line)
           sendMessageButton.addEventListener('click', sendMessage);
           chatInput.addEventListener('keydown', (e) => {
@@ -912,16 +1162,89 @@
               sendMessage();
             }
           });
-          
+
+          // Format message content with markdown-like syntax
+          function formatMessageContent(text) {
+            // Format code blocks
+            text = text.replace(/```([\s\S]*?)```/g, '<pre>$1</pre>');
+            
+            // Format inline code
+            text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            // Format bullet points
+            text = text.replace(/^[•*-]\s(.+)$/gm, '• $1');
+            
+            // Convert line breaks
+            text = text.replace(/\n/g, '<br>');
+            
+            return text;
+          }
+
           // Add message to chat
-          function addMessage(text, role) {
+          function addMessage(text, role, isError = false) {
             const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${role}-message`;
-            messageDiv.textContent = text;
+            messageDiv.className = `message ${role}-message${isError ? ' error' : ''}`;
+            
+            const timestamp = document.createElement('div');
+            timestamp.className = 'timestamp';
+            timestamp.textContent = new Date().toLocaleTimeString();
+            messageDiv.appendChild(timestamp);
+            
+            const content = document.createElement('div');
+            content.className = 'content';
+            content.innerHTML = formatMessageContent(text);
+            messageDiv.appendChild(content);
+            
             chatMessages.appendChild(messageDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
+            return messageDiv;
           }
-          
+
+          // Show loading state
+          function showLoadingMessage() {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message assistant-message loading';
+            loadingDiv.innerHTML = '<div class="content">Thinking...</div>';
+            chatMessages.appendChild(loadingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return loadingDiv;
+          }
+
+          // Handle message sending
+          async function sendMessage() {
+            const message = chatInput.value.trim();
+            if (!message) return;
+            
+            // Add user message
+            addMessage(message, 'user');
+            chatInput.value = '';
+            
+            // Show loading state
+            const loadingMessage = showLoadingMessage();
+            
+            // Disable input while waiting
+            chatInput.disabled = true;
+            sendMessageButton.disabled = true;
+            
+            try {
+              // Send to OpenAI
+              parent.postMessage({ 
+                pluginMessage: { 
+                  type: 'chat-message',
+                  message: message
+                }
+              }, '*');
+            } catch (error) {
+              // Remove loading message and show error
+              loadingMessage.remove();
+              addMessage('Error: Failed to send message. Please try again.', 'assistant', true);
+              
+              // Re-enable input
+              chatInput.disabled = false;
+              sendMessageButton.disabled = false;
+            }
+          }
+
           // Listen for responses
           window.addEventListener('message', (event) => {
             const message = event.data.pluginMessage;
@@ -933,7 +1256,18 @@
                 sendMessageButton.disabled = false;
               }
             } else if (message.type === 'chat-response') {
-              addMessage(message.response, 'assistant');
+              // Remove any loading messages
+              const loadingMessages = chatMessages.getElementsByClassName('loading');
+              Array.from(loadingMessages).forEach(msg => msg.remove());
+              
+              // Add the response
+              if (message.error) {
+                addMessage(message.error, 'assistant', true);
+              } else {
+                addMessage(message.response, 'assistant');
+              }
+              
+              // Re-enable input
               chatInput.disabled = false;
               sendMessageButton.disabled = false;
             }
@@ -1181,10 +1515,16 @@
       // Send success response back to WebSocket
       function sendSuccessResponse(id, result) {
         if (!state.connected || !state.socket) {
-          console.error("Cannot send response: socket not connected");
+          console.warn('Socket not connected, storing response for later');
+          // Store response to be sent when connection is restored
+          if (!state.pendingResponses) {
+            state.pendingResponses = [];
+          }
+          state.pendingResponses.push({ id, result });
           return;
         }
 
+        try {
         state.socket.send(
           JSON.stringify({
             id,
@@ -1196,6 +1536,10 @@
             },
           })
         );
+        } catch (error) {
+          console.error('Error sending response:', error);
+          showNotification('error', 'Failed to send response to server');
+        }
       }
 
       // Send error response back to WebSocket
@@ -1475,83 +1819,130 @@
         progressPercentage.textContent = "0%";
       }
 
-      // Listen for messages from the plugin code
-      window.onmessage = (event) => {
+      // Add logStep function at the top of your script
+      function logStep(step, details = '') {
+        const message = details ? `${step} - ${details}` : step;
+        console.log(message);
+      }
+
+      window.onmessage = async (event) => {
         const message = event.data.pluginMessage;
-        if (!message) return;
-
-        console.log("Received message from plugin:", message);
-
+        
         switch (message.type) {
-          case "connection-status":
-            updateConnectionStatus(message.connected, message.message);
+          case 'console-log':
+            // Display console log in the UI
+            const logContainer = document.getElementById('log-container') || createLogContainer();
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.textContent = message.message;
+            logContainer.appendChild(logEntry);
+            // Auto-scroll to bottom
+            logContainer.scrollTop = logContainer.scrollHeight;
             break;
-          case "auto-connect":
-            connectButton.click();
+            
+          case "init-settings":
+            // ... existing init-settings case ...
             break;
-          case "auto-disconnect":
-            disconnectButton.click();
+            
+          case "command-result":
+            // ... existing command-result case ...
             break;
           case "command-result":
-            // Forward the result from plugin code back to WebSocket
-            sendSuccessResponse(message.id, message.result);
-            break;
-          case "command-error":
-            // Forward the error from plugin code back to WebSocket
-            sendErrorResponse(message.id, message.error);
-            break;
-          case "command_progress":
-            // Update UI with progress information
-            updateProgressUI(message);
-            // Forward progress update to server
-            sendProgressUpdateToServer(message);
-            break;
-          case "export-atlas-json":
-            console.log('Received atlas JSON:', message.data);
-            
-            // Create a container for the atlas JSON preview
-            const container = document.createElement('div');
-            container.className = 'atlas-json-preview';
-            container.style.cssText = `
-              background: #1e1e1e;
-              color: #d4d4d4;
-              padding: 16px;
-              border-radius: 8px;
-              margin: 16px 0;
-              font-family: monospace;
-              white-space: pre-wrap;
-              max-height: 300px;
-              overflow-y: auto;
-            `;
-            
-            // Add the JSON preview
-            container.textContent = JSON.stringify(message.data, null, 2);
-            
-            // Create download button
-            const downloadBtn = document.createElement('button');
-            downloadBtn.textContent = 'Download phaser-atlas.json';
-            downloadBtn.className = 'button button--primary';
-            downloadBtn.style.marginTop = '8px';
-            downloadBtn.onclick = () => {
-              const jsonBlob = new Blob([JSON.stringify(message.data, null, 2)], { type: 'application/json' });
-              const url = URL.createObjectURL(jsonBlob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = 'phaser-atlas.json';
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              URL.revokeObjectURL(url);
-            };
-            
-            // Add elements to the page
-            const resultsDiv = document.getElementById('results') || document.body;
-            resultsDiv.innerHTML = ''; // Clear previous results
-            resultsDiv.appendChild(container);
-            resultsDiv.appendChild(downloadBtn);
+            if (message.command === 'export-tile-map') {
+              console.log('Raw map data received:', message.result);
+              
+              if (message.result.success && message.result.mapData) {
+                try {
+                  // Create a custom formatter function for Tiled-style JSON
+                  const customFormatter = (obj, indent = 0) => {
+                    const spaces = ' '.repeat(indent);
+                    
+                    if (Array.isArray(obj)) {
+                      // Special handling for data array in tilelayer
+                      if (obj.length > 0 && typeof obj[0] === 'number') {
+                        return `[${obj.join(',')}]`;
+                      }
+                      
+                      // Format other arrays with items on separate lines
+                      const items = obj.map(item => 
+                        typeof item === 'object' && item !== null
+                          ? `${spaces}  ${JSON.stringify(item, null, 2).replace(/^/gm, ' '.repeat(indent + 2))}`
+                          : `${spaces}  ${JSON.stringify(item)}`
+                      ).join(',\n');
+                      
+                      return `[\n${items}\n${spaces}]`;
+                    }
+                    
+                    if (typeof obj === 'object' && obj !== null) {
+                      const entries = Object.entries(obj);
+                      const formatted = entries.map(([k, v]) => {
+                        const value = typeof v === 'object' && v !== null
+                          ? customFormatter(v, indent + 2)
+                          : JSON.stringify(v);
+                        return `${spaces}  "${k}": ${value}`;
+                      }).join(',\n');
+                      
+                      return `{\n${formatted}\n${spaces}}`;
+                    }
+                    
+                    return JSON.stringify(obj);
+                  };
+
+                  // Format the JSON data using custom formatter
+                  const formattedJson = customFormatter(message.result.mapData);
+                  
+                  // Create and trigger download
+                  const blob = new Blob([formattedJson], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `tilemap-${new Date().toISOString().slice(0,19).replace(/[:-]/g, '')}.json`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                } catch (error) {
+                  console.error('Error processing map data:', error);
+                }
+              }
+            }
             break;
         }
       };
+
+      // Create log container if it doesn't exist
+      function createLogContainer() {
+        const container = document.createElement('div');
+        container.id = 'log-container';
+        container.style.cssText = `
+          position: fixed;
+          bottom: 10px;
+          left: 10px;
+          right: 10px;
+          max-height: 200px;
+          overflow-y: auto;
+          background: rgba(0, 0, 0, 0.8);
+          color: white;
+          font-family: monospace;
+          padding: 10px;
+          border-radius: 4px;
+          font-size: 12px;
+          z-index: 1000;
+        `;
+        document.body.appendChild(container);
+        return container;
+      }
+
+      // Add styles for log entries
+      const style = document.createElement('style');
+      style.textContent = `
+        .log-entry {
+          margin: 4px 0;
+          white-space: pre-wrap;
+          word-break: break-word;
+        }
+      `;
+      document.head.appendChild(style);
 
       document.addEventListener('DOMContentLoaded', () => {
         // Tab handling
@@ -1834,6 +2225,7 @@
         const snapToGridBtn = document.getElementById('snapToGrid');
         const exportPhaserMapBtn = document.getElementById('exportPhaserMap');
         const convertToFrameBtn = document.getElementById('convertToFrame');
+        const convertToSpriteFrameBtn = document.getElementById('convertToSpriteFrame');
         const generateTilesBtn = document.getElementById('generateTiles');
 
         if (createGridFrameBtn) {
@@ -1927,7 +2319,19 @@
 
         if (convertToFrameBtn) {
           convertToFrameBtn.onclick = () => {
-            addLogEntry('Converting selection to frame...', 'info');
+            addLogEntry('Converting selection to basic frame...', 'info');
+            parent.postMessage({ 
+              pluginMessage: { 
+                type: 'execute-command',
+                command: 'convert_to_basic_frame'
+              }
+            }, '*');
+          };
+        }
+
+        if (convertToSpriteFrameBtn) {
+          convertToSpriteFrameBtn.onclick = () => {
+            addLogEntry('Converting selection to sprite frame...', 'info');
             parent.postMessage({ 
               pluginMessage: { 
                 type: 'execute-command',
@@ -2026,7 +2430,104 @@
               break;
           }
         });
+
+        // Add frame-up button handler
+        const frameUpBtn = document.getElementById('frame-up-btn');
+        if (frameUpBtn) {
+          frameUpBtn.onclick = () => {
+            addLogEntry('Executing Frame Up command...', 'info');
+            parent.postMessage({ 
+              pluginMessage: {
+                type: 'execute-command',
+                command: 'frame-up',
+                params: {}
+              }
+            }, '*');
+          };
+        }
+
+        // Export Tile Map button handler
+        const exportTileMapBtn = document.getElementById('exportTileMap');
+        if (exportTileMapBtn) {
+          exportTileMapBtn.onclick = () => {
+            const gridSize = parseInt(document.getElementById('selectionGridSize').value);
+            const command = {
+              type: 'execute-command',
+              command: 'export-tile-map',
+              params: {
+                gridSize: gridSize
+              }
+            };
+            parent.postMessage({ pluginMessage: command }, '*');
+          };
+        }
       });
-    </script>
-  </body>
-</html>
+
+      // Add showNotification function
+      function showNotification(type, message, duration = 3000) {
+        const notification = document.getElementById('notification');
+        notification.textContent = message;
+        notification.className = `notification ${type}`;
+        
+        // Force reflow to trigger animation
+        notification.offsetHeight;
+        
+        notification.classList.add('show');
+        
+        setTimeout(() => {
+          notification.classList.remove('show');
+        }, duration);
+      }
+
+      // Add function to handle stored responses
+      function processPendingResponses() {
+        if (state.pendingResponses && state.pendingResponses.length > 0) {
+          console.log('Processing pending responses...');
+          while (state.pendingResponses.length > 0) {
+            const { id, result } = state.pendingResponses.shift();
+            sendSuccessResponse(id, result);
+          }
+        }
+      }
+
+      // Update socket onopen handler
+      state.socket.onopen = () => {
+        // Generate random channel name
+        const channelName = generateChannelName();
+        addLogEntry(`WebSocket connection established, joining channel: ${channelName}`, 'info');
+        state.channel = channelName;
+
+        // Join the channel using the same format as App.tsx
+        state.socket.send(
+          JSON.stringify({
+            type: "join",
+            channel: channelName.trim(),
+          })
+        );
+
+        // Process any pending responses
+        processPendingResponses();
+      };
+
+      // Add notification function
+      function showNotification(type, message) {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        // Trigger reflow to ensure animation works
+        notification.offsetHeight;
+        notification.classList.add('show');
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+          notification.classList.remove('show');
+          setTimeout(() => {
+            document.body.removeChild(notification);
+          }, 300);
+        }, 3000);
+      }
+            </script>
+          </body>
+        </html>
