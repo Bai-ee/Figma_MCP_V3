@@ -4,6 +4,13 @@
     <meta charset="utf-8" />
     <title>Cursor MCP Plugin</title>
     <script>
+      // Debug logging function
+      function debugLog(step, details) {
+        const timestamp = new Date().toLocaleTimeString();
+        console.log(`[${timestamp}] [DEBUG] ${step}:`, details);
+        // Remove logging to chat messages - only log to console
+      }
+
       // First attempt to load from CDN with fallback
       (function loadJSZip() {
         // Try loading from CDN first
@@ -67,7 +74,7 @@
       .container {
         display: flex;
         flex-direction: column;
-        height: 100%;
+        height: 100px;
       }
       h1 {
         font-size: 16px;
@@ -93,6 +100,7 @@
         cursor: pointer;
         font-size: 14px;
         transition: background-color 0.2s;
+        width:100%;
       }
       button:hover {
         background-color: #0d8ee0;
@@ -197,452 +205,225 @@
       .link {
         color: #18a0fb;
         text-decoration: none;
-        cursor: pointer;
       }
-      .link:hover {
-        text-decoration: underline;
-      }
-      .header-logo {
-        padding: 16px;
-        border-radius: 16px;
-        background-color: #333;
-      }
-      .header-logo-image {
-        width: 24px;
-        height: 24px;
-        object-fit: contain;
-      }
-      /* Progress styles */
-      .operation-complete {
-        color: #4ade80;
-      }
-      .operation-error {
-        color: #ff9999;
-      }
-      .tool-group {
-        display: flex;
-        gap: 8px;
-        margin-bottom: 16px;
-        flex-wrap: wrap;
-      }
-      .tool-group button {
-        flex: 1;
-        min-width: 120px;
-      }
-      /* Log styles */
-      .log-container {
-        background-color: #2d2d2d;
-        border: 1px solid #444;
-        border-radius: 4px;
-        padding: 12px;
-        height: 100px;
-        overflow-y: auto;
-        margin-bottom: 16px;
+      
+      /* Debug message styling */
+      .debug-message {
         font-family: monospace;
+        padding: 4px 8px;
+        margin: 2px 0;
+        background-color: #2d2d2d;
+        border-left: 3px solid #18a0fb;
         font-size: 12px;
       }
-      .log-entry {
-        margin-bottom: 4px;
-        color: #e0e0e0;
-      }
-      .log-entry.success { color: #4ade80; }
-      .log-entry.error { color: #ff9999; }
-      .log-entry.info { color: #66b3ff; }
-      .log-entry .timestamp {
-        color: #999999;
-        margin-right: 8px;
-      }
-      .log-entry .structured-data {
-        display: block;
-        margin-top: 4px;
-        margin-left: 16px;
+
+      /* Chat message container */
+      #chat-messages {
+        max-height: 300px;
+        overflow-y: auto;
+        /* margin-bottom: 10px; */
         padding: 8px;
-        background-color: #2a2a2a;
-        border-radius: 4px;
-        border-left: 2px solid #444;
-      }
-      .log-entry .section-header {
-        color: #e6e6e6;
-        font-weight: bold;
-        margin-top: 4px;
-      }
-      .log-entry .section-content {
-        margin-left: 12px;
-        color: #cccccc;
-      }
-      .form-group {
-        margin-bottom: 16px;
-      }
-      label {
-        display: block;
-        margin-bottom: 8px;
-        font-size: 12px;
-        color: #ccc;
-      }
-      input[type="number"] {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #444;
-        border-radius: 4px;
-        font-size: 14px;
         background-color: #2d2d2d;
-        color: #e0e0e0;
-      }
-      .tile-container {
-        padding: 16px;
-      }
-      .chat-container {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-      }
-      
-      .api-key-section {
-        margin-bottom: 16px;
-        padding: 10px;
-        background-color: #2d2d2d;
-        border: 1px solid #444444;
         border-radius: 4px;
-        font-family: monospace;
-        font-size: 12px;
-        height: 80px;
-        overflow-y: auto;
-      }
-      
-      .api-key-section h2 {
-        color: #e0e0e0;
-        font-size: 12px;
-        font-weight: normal;
-        margin-bottom: 6px;
-        font-family: monospace;
-        padding-left: 4px;
-      }
-      
-      .api-key-input {
-        display: flex;
-        gap: 6px;
-        margin-bottom: 6px;
-        padding: 3px;
-        background-color: #1e1e1e;
-        border-radius: 4px;
-      }
-      
-      .api-key-input input {
-        flex-grow: 1;
-        padding: 3px 6px;
-        border: 1px solid #444444;
-        border-radius: 4px;
-        background-color: #2a2a2a;
-        color: #e0e0e0;
-        font-family: monospace;
-        font-size: 11px;
-      }
-      
-      .api-key-input button {
-        padding: 3px 6px;
-        background-color: #333333;
-        border: 1px solid #444444;
-        border-radius: 4px;
-        color: #cccccc;
-        cursor: pointer;
-        font-size: 10px;
-        transition: background-color 0.2s;
-      }
-      
-      .api-key-input button:hover {
-        background-color: #404040;
-      }
-      
-      .api-key-status {
-        font-size: 11px;
-        padding: 3px 6px;
-        margin: 3px;
-        border-radius: 4px;
-        font-family: monospace;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        color: #e0e0e0;
-      }
-      
-      .api-key-status.valid {
-        color: #66b3ff;
-      }
-      
-      .api-key-status.valid::before {
-        content: '✓';
-        color: #66b3ff;
-      }
-      
-      .api-key-status::before {
-        display: none;
-      }
-      
-      #save-api-key {
-        margin: 3px;
-        padding: 3px 6px;
-        background-color: #333333;
-        border: 1px solid #444444;
-        border-radius: 4px;
-        color: #e0e0e0;
-        cursor: pointer;
-        font-size: 10px;
-        font-family: monospace;
-        transition: background-color 0.2s;
-      }
-      
-      #save-api-key:hover {
-        background-color: #404040;
-      }
-      
-      #save-api-key:disabled {
-        background-color: #2d2d2d;
-        color: #666666;
-        cursor: not-allowed;
-      }
-      
-      .chat-messages {
-        flex-grow: 1;
-        overflow-y: auto;
-        margin-bottom: 16px;
-        padding: 16px;
-        background-color: #2d2d2d;
-        border: 1px solid #444444;
-        border-radius: 8px;
-        min-height: 200px;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        font-size: 14px;
-      }
-      
-      .message {
-        margin-bottom: 16px;
-        padding: 12px;
-        border-radius: 6px;
-        position: relative;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-      }
-      
-      .message .timestamp {
-        position: absolute;
-        top: 8px;
-        right: 12px;
-        font-size: 11px;
-        color: rgba(255, 255, 255, 0.5);
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      }
-
-      .message .content {
-        margin-top: 16px;
-        white-space: pre-wrap;
-        word-break: break-word;
-        color: #e0e0e0;
-        line-height: 1.5;
-      }
-
-      .message code {
-        background: rgba(0, 0, 0, 0.3);
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-family: monospace;
-        font-size: 13px;
-        color: #cccccc;
-      }
-      
-      .user-message {
-        background-color: #1a3147;
-        margin-left: 40px;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-      }
-      
-      .assistant-message {
-        background-color: #1a472a;
-        margin-right: 40px;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-      }
-
-      .message.loading {
-        opacity: 0.7;
-      }
-
-      .message.loading::after {
-        content: '';
-        display: inline-block;
-        width: 12px;
-        height: 12px;
-        border: 2px solid #ffffff;
-        border-radius: 50%;
-        border-top-color: transparent;
-        animation: spin 1s linear infinite;
-        margin-left: 8px;
-      }
-
-      .message.error {
-        background-color: #471a1a;
-        border-color: rgba(255, 99, 99, 0.3);
-      }
-
-      .message pre {
-        background: rgba(0, 0, 0, 0.3);
-        padding: 12px;
-        border-radius: 6px;
-        overflow-x: auto;
-        font-family: monospace;
-        margin: 8px 0;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        font-size: 13px;
-        color: #cccccc;
-      }
-
-      .chat-input {
-        display: flex;
-        gap: 8px;
-        margin-top: 8px;
-      }
-      
-      .chat-input textarea {
-        flex-grow: 1;
-        padding: 12px;
-        border: 1px solid #444444;
-        border-radius: 6px;
-        background-color: #2d2d2d;
-        color: #e0e0e0;
-        resize: none;
-        min-height: 40px;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        font-size: 14px;
-        line-height: 1.5;
-      }
-      
-      .chat-input textarea:focus {
-        outline: none;
-        border-color: #18a0fb;
-        box-shadow: 0 0 0 2px rgba(24, 160, 251, 0.2);
-      }
-      
-      .chat-input button {
-        padding: 8px 16px;
-        background-color: #18a0fb;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-        transition: background-color 0.2s;
-      }
-      
-      .chat-input button:hover {
-        background-color: #0d8ee0;
-      }
-      
-      .chat-input button:disabled {
-        background-color: #333333;
-        color: #666666;
-        cursor: not-allowed;
-      }
-      
-      .api-key-input {
-        width: 100%;
-        padding: 12px;
-        margin-bottom: 8px;
-        border: 1px solid #444444;
-        border-radius: 6px;
-        background-color: #2d2d2d;
-        color: #e0e0e0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        font-size: 14px;
-      }
-
-      .api-key-status {
-        font-size: 12px;
-        margin-top: 8px;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      }
-      
-      .api-key-status.valid {
-        color: #4ade80;
-      }
-      
-      .api-key-status.invalid {
-        color: #ff9999;
-      }
-
-      .api-key-section h2 {
-        color: #cccccc;
-        font-size: 12px;
-        font-weight: 500;
-        margin-bottom: 12px;
-        font-family: monospace;
-      }
-      .status-message {
-        display: none;
-        position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 8px 16px;
-        border-radius: 4px;
-        font-size: 14px;
-        z-index: 1000;
-        transition: opacity 0.3s ease;
-      }
-      .status-message.success {
-        display: block;
-        background-color: #4CAF50;
-        color: white;
-      }
-      .status-message.error {
-        display: block;
-        background-color: #f44336;
-        color: white;
-      }
-      .atlas-json-preview::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      
-      .atlas-json-preview::-webkit-scrollbar-track {
-        background: #2e2e2e;
-        border-radius: 4px;
-      }
-      
-      .atlas-json-preview::-webkit-scrollbar-thumb {
-        background: #666;
-        border-radius: 4px;
-      }
-      
-      .atlas-json-preview::-webkit-scrollbar-thumb:hover {
-        background: #888;
-      }
-      
-      /* Add notification styles */
-      .notification {
-        position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 12px 24px;
-        border-radius: 6px;
-        font-size: 14px;
-        z-index: 1000;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-      }
-      
-      .notification.success {
-        background-color: #1a472a;
-        color: #4ade80;
-      }
-      
-      .notification.error {
-        background-color: #471a1a;
-        color: #ff9999;
-      }
-      
-      .notification.show {
-        opacity: 1;
       }
     </style>
+    <script>
+      // Debug logging function
+      function debugLog(step, details) {
+        const timestamp = new Date().toLocaleTimeString();
+        console.log(`[${timestamp}] [DEBUG] ${step}:`, details);
+        // Remove logging to chat messages - only log to console
+      }
+
+      // Validate API key format
+      function validateApiKey(key) {
+        const isValid = /^sk-(?:proj-)?[A-Za-z0-9-_]{32,}$/.test(key.trim());
+        debugLog('API Key Validation', { 
+          isValid, 
+          keyLength: key.length,
+          keyStart: key.substring(0, 5) + '...'
+        });
+        return isValid;
+      }
+
+      // Update API key status
+      function updateApiKeyStatus(key) {
+        debugLog('Updating API Key Status', { 
+          hasKey: !!key,
+          keyLength: key ? key.length : 0,
+          keyStart: key ? key.substring(0, 5) + '...' : 'none'
+        });
+        
+        if (!key) {
+          apiKeyStatus.textContent = 'Please enter your API key';
+          apiKeyStatus.className = 'api-key-status';
+          debugLog('API Key Status Updated', { status: 'empty' });
+          return false;
+        }
+        
+        const isValid = validateApiKey(key);
+        apiKeyStatus.textContent = isValid 
+          ? 'Valid API key format' 
+          : 'Invalid API key format. It should start with "sk-" or "sk-proj-" followed by at least 32 characters';
+        apiKeyStatus.className = `api-key-status ${isValid ? 'valid' : 'invalid'}`;
+        
+        debugLog('API Key Status Updated', { 
+          status: isValid ? 'valid' : 'invalid',
+          statusText: apiKeyStatus.textContent
+        });
+        
+        // Update send button state
+        updateSendButtonState();
+        
+        return isValid;
+      }
+
+      // Update send button state
+      function updateSendButtonState() {
+        const hasValidKey = apiKeyInput.value.trim() && validateApiKey(apiKeyInput.value.trim());
+        const hasMessage = chatInput.value.trim().length > 0;
+        const shouldEnable = hasValidKey && hasMessage;
+        
+        const buttonState = {
+          hasValidKey,
+          hasMessage,
+          shouldEnable,
+          currentlyDisabled: sendMessageButton.disabled,
+          chatInputDisabled: chatInput.disabled,
+          buttonElement: {
+            id: sendMessageButton.id,
+            hasDisabledAttribute: sendMessageButton.hasAttribute('disabled'),
+            disabledProperty: sendMessageButton.disabled
+          }
+        };
+        
+        debugLog('Updating Send Button State', buttonState);
+        
+        sendMessageButton.disabled = !shouldEnable;
+        chatInput.disabled = !hasValidKey;
+
+        // Force button state update
+        if (shouldEnable) {
+          sendMessageButton.removeAttribute('disabled');
+          debugLog('Button Enabled', { 
+            method: 'removeAttribute',
+            currentState: sendMessageButton.disabled,
+            hasDisabledAttribute: sendMessageButton.hasAttribute('disabled')
+          });
+        } else {
+          sendMessageButton.setAttribute('disabled', 'disabled');
+          debugLog('Button Disabled', { 
+            method: 'setAttribute',
+            currentState: sendMessageButton.disabled,
+            hasDisabledAttribute: sendMessageButton.hasAttribute('disabled')
+          });
+        }
+      }
+
+      // Update API key status
+      function updateApiKeyStatus(key) {
+        const isValid = validateApiKey(key);
+        const saveButton = document.getElementById('save-api-key-btn');
+        const chatInput = document.getElementById('chat-input');
+        
+        if (saveButton) {
+          saveButton.disabled = !isValid;
+        }
+        
+        if (isValid && chatInput) {
+          chatInput.disabled = false;
+          updateSendButtonState();
+        }
+        
+        debugLog('API Key Status Update', { isValid, saveButtonEnabled: !saveButton.disabled });
+      }
+
+      // Send message function
+      async function sendMessage() {
+        const chatInput = document.getElementById('chat-input');
+        const sendButton = document.getElementById('send-message-btn');
+        const message = chatInput.value.trim();
+        
+        debugLog('Sending Message', { messageLength: message.length });
+        
+        if (!message) {
+          debugLog('Send Aborted', { reason: 'Empty message' });
+          return;
+        }
+        
+        try {
+          chatInput.disabled = true;
+          sendButton.disabled = true;
+          
+          // Send message to parent context
+          parent.postMessage({ pluginMessage: { type: 'send-message', message } }, '*');
+          debugLog('Message Sent to Parent', { success: true });
+          
+          // Clear input after successful send
+          chatInput.value = '';
+        } catch (error) {
+          debugLog('Send Error', { error: error.message });
+          chatInput.disabled = false;
+          updateSendButtonState();
+        }
+      }
+
+      // Document ready handler
+      document.addEventListener('DOMContentLoaded', () => {
+        debugLog('Page Loaded', { timestamp: new Date().toISOString() });
+        
+        // Set up API key input handler
+        const apiKeyInput = document.getElementById('api-key-input');
+        if (apiKeyInput) {
+          apiKeyInput.addEventListener('input', (e) => {
+            updateApiKeyStatus(e.target.value);
+          });
+        }
+        
+        // Set up chat input handler
+        const chatInput = document.getElementById('chat-input');
+        if (chatInput) {
+          chatInput.addEventListener('input', () => {
+            updateSendButtonState();
+          });
+          
+          chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              sendMessage();
+            }
+          });
+        }
+        
+        // Set up send button handler
+        const sendButton = document.getElementById('send-message-btn');
+        if (sendButton) {
+          sendButton.addEventListener('click', sendMessage);
+        }
+        
+        // Initialize states
+        const savedApiKey = localStorage.getItem('openai-api-key');
+        if (savedApiKey) {
+          updateApiKeyStatus(savedApiKey);
+        }
+      });
+
+      // Message handler from parent
+      window.addEventListener('message', (event) => {
+        const message = event.data.pluginMessage;
+        if (!message) return;
+        
+        debugLog('Received Message', { type: message.type });
+        
+        if (message.type === 'api-key-saved') {
+          const chatInput = document.getElementById('chat-input');
+          if (chatInput) {
+            chatInput.disabled = false;
+          }
+          updateSendButtonState();
+        }
+      });
+    </script>
   </head>
   <body>
     <div class="container">
@@ -657,21 +438,21 @@
           />
         </div> -->
         <div class="header-text">
-          <h1>Bai-ee's Talk To Figma Plugin</h1>
-          <p>Connect Figma to Cursor AI using MCP</p>
+          <h1>Critter's Quest Tools V1</h1>
+          <!-- <p>V1</p> -->
         </div>
       </div>
 
       <div class="tabs">
-        <div id="tab-tools" class="tab">Tools</div>
-        <div id="tab-tile" class="tab"> Map & Sprites</div>
+        <div id="tab-tools" class="tab active">Tools</div>
+        <!-- <div id="tab-tile" class="tab"> Map & Sprites</div> -->
         <div id="tab-about" class="tab">Chat</div>
-        <div id="tab-connection" class="tab active">MCP</div>
+        <!-- <div id="tab-connection" class="tab active">MCP</div> -->
       </div>
 
       <div id="status" class="status-message"></div>
 
-      <div id="content-connection" class="tab-content active">
+      <div id="content-connection" class="tab-content">
         <div class="section">
           <label for="port">WebSocket Server Port</label>
           <div style="display: flex; gap: 8px">
@@ -711,25 +492,59 @@
         </div>
       </div>
 
-      <div id="content-tools" class="tab-content">
+      <div id="content-tools" class="tab-content active">
         <div class="section">
-          <h2>Frame Tools</h2>
+          <h2>Frame Up</h2>
+          <label>Place selection in a frame at its original size</label>
           <div class="tool-group">
-            <button id="frame-up-btn" class="secondary">Frame Up</button>
+            <button id="frame-up-btn" class="button">Frame Up</button>
           </div>
-          <div id="tools-log" class="log-container"></div>
           
-          <h2>Analyze</h2>
+          <h2>Frame Down</h2>
+          <label>Place oversized selection into a frame for resizing</label>
+          <button id="convertToFrame" class="button">Frame Down</button>
+
+          <h2>Sprite Frame</h2>
+          <label>Place selection in a frame divisible by 2</label>
+          <button id="convertToSpriteFrame" class="button">Convert to Sprite Frame</button>
+          
+          <h2>Create Atlas</h2>
+          <label>Create Atlas/DL JSON selecting multiple frames</label>
+          <button id="createAtlas" class="button">Create Atlas</button>
+          
+          <h2>Export Tile Map</h2>
+          <label>DL Tile Map JSON with map and item coordinates</label>
+          <button id="exportTileMap" class="button">Export Tile Map</button>
+
+          <h2>Creaate Tile Map</h2>
+          <div class="form-group">
+            <label for="frameWidth">Frame Width (px):</label>
+            <input type="number" id="frameWidth" value="1200" min="1">
+          </div>
+          <div class="form-group">
+            <label for="frameHeight">Frame Height (px):</label>
+            <input type="number" id="frameHeight" value="900" min="1">
+          </div>
+          <div class="form-group">
+            <label for="gridSize">Grid Size (px):</label>
+            <input type="number" id="gridSize" value="8" min="1">
+          </div>
+          <button id="createGridFrame" class="button">Create Tile Map</button>
+          
+          <div style="margin: 20px 0; border-bottom: 1px solid #444;"></div>
+          <!-- <div id="tools-log" class="log-container"></div> -->
+          
+          <!-- <h2>Analyze</h2>
           <div class="tool-group">
             <button id="analyze-layers" class="secondary">
               Analyze Layers
             </button>
             <button id="delete-layers" class="secondary" disabled>
               Delete
-            </button>
+            </button> -->
           </div>
 
-          <h2>Design Tools</h2>
+          <!-- <h2>Design Tools</h2>
           <div class="tool-group">
             <button id="scan-text" class="secondary">
               Scan Text Nodes
@@ -747,9 +562,9 @@
             <button id="create-auto-layout" class="secondary">
               Create Auto-Layout
             </button>
-          </div>
+          </div> -->
 
-          <h2>Export Tools</h2>
+          <!-- <h2>Export Tools</h2>
           <div class="tool-group">
             <button id="export-selection" class="secondary">
               Export Selection
@@ -757,7 +572,7 @@
             <button id="export-selection-zip" class="secondary">
               Export as PNG (2x)
             </button>
-          </div>
+          </div> -->
         </div>
       </div>
 
@@ -765,7 +580,7 @@
         <div class="tile-container">
           <div class="log-container" id="tile-log" style="height: 75px;"></div>
           
-          <h2>Creaate Tile Map</h2>
+          <!-- <h2>Creaate Tile Map</h2>
           <div class="form-group">
             <label for="frameWidth">Frame Width (px):</label>
             <input type="number" id="frameWidth" value="1200" min="1">
@@ -780,9 +595,9 @@
           </div>
           <button id="createGridFrame" class="button">Create Tile Map</button>
           
-          <div style="margin: 20px 0; border-bottom: 1px solid #444;"></div>
+          <div style="margin: 20px 0; border-bottom: 1px solid #444;"></div> -->
           
-          <h2>Centered Tile</h2>
+          <!-- <h2>Centered Tile</h2>
           <div class="form-group">
             <label for="tileSize">Tile Size (px, must be divisible by 8):</label>
             <input type="number" id="tileSize" value="32" min="8" step="8">
@@ -798,7 +613,7 @@
           </div>
           <button id="snapToGrid" class="button">Snap Selection to Grid</button>
           
-          <div style="margin: 20px 0; border-bottom: 1px solid #444;"></div>
+          <div style="margin: 20px 0; border-bottom: 1px solid #444;"></div> -->
           
           <h2>Phaser Export</h2>
           <div class="form-group">
@@ -826,10 +641,10 @@
             <label for="selectionGridSize">Grid Size (px, must be divisible by 2):</label>
             <input type="number" id="selectionGridSize" value="32" min="2" step="2">
           </div>
-          <button id="convertToFrame" class="button">Convert to Frame</button>
+          <!-- <button id="convertToFrame" class="button">Convert to Frame</button>
           <button id="convertToSpriteFrame" class="button">Convert to Sprite Frame</button>
           <button id="createAtlas" class="button">Create Atlas</button>
-          <button id="exportTileMap" class="button">Export Tile Map</button>
+          <button id="exportTileMap" class="button">Export Tile Map</button> -->
           <div style="margin: 20px 0; border-bottom: 1px solid #444;"></div>
           <h2>Tile Generator</h2>
           <div class="form-group">
@@ -853,30 +668,64 @@
           .chat-container {
             display: flex;
             flex-direction: column;
-            height: 100%;
+            height: auto;
+            gap: 16px;
+            padding: 0px;
           }
           
           .api-key-section {
-            margin-bottom: 16px;
-            padding: 16px;
             background-color: #2d2d2d;
             border: 1px solid #444444;
             border-radius: 8px;
+            padding: 16px;
+          }
+          
+          .api-key-section h2 {
+            color: #cccccc;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 12px;
+          }
+          
+          .api-key-input {
+            position: relative;
+            width: 100%;
+          }
+          
+          .api-key-input input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #444444;
+            border-radius: 6px;
+            background-color: #2d2d2d;
+            color: #e0e0e0;
             font-family: monospace;
+            font-size: 14px;
+          }
+          
+          .api-key-status {
+            margin-top: 8px;
             font-size: 12px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          }
+          
+          .api-key-status.valid {
+            color: #4ade80;
+          }
+          
+          .api-key-status.invalid {
+            color: #ff9999;
           }
           
           .chat-messages {
             flex-grow: 1;
             overflow-y: auto;
-            margin-bottom: 16px;
-            padding: 16px;
             background-color: #2d2d2d;
             border: 1px solid #444444;
             border-radius: 8px;
-            min-height: 200px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            font-size: 14px;
+            /* min-height: 300px; */
+            padding: 16px;
+            height:auto;
           }
           
           .message {
@@ -893,9 +742,8 @@
             right: 12px;
             font-size: 11px;
             color: rgba(255, 255, 255, 0.5);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
           }
-
+          
           .message .content {
             margin-top: 16px;
             white-space: pre-wrap;
@@ -903,7 +751,22 @@
             color: #e0e0e0;
             line-height: 1.5;
           }
-
+          
+          .user-message {
+            background-color: #1a3147;
+            margin-left: 40px;
+          }
+          
+          .assistant-message {
+            background-color: #1a472a;
+            margin-right: 40px;
+          }
+          
+          .message.error {
+            background-color: #471a1a;
+            border-color: rgba(255, 99, 99, 0.3);
+          }
+          
           .message code {
             background: rgba(0, 0, 0, 0.3);
             padding: 2px 6px;
@@ -913,39 +776,6 @@
             color: #cccccc;
           }
           
-          .user-message {
-            background-color: #1a3147;
-            margin-left: 40px;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-          }
-          
-          .assistant-message {
-            background-color: #1a472a;
-            margin-right: 40px;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-          }
-
-          .message.loading {
-            opacity: 0.7;
-          }
-
-          .message.loading::after {
-            content: '';
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border: 2px solid #ffffff;
-            border-radius: 50%;
-            border-top-color: transparent;
-            animation: spin 1s linear infinite;
-            margin-left: 8px;
-          }
-
-          .message.error {
-            background-color: #471a1a;
-            border-color: rgba(255, 99, 99, 0.3);
-          }
-
           .message pre {
             background: rgba(0, 0, 0, 0.3);
             padding: 12px;
@@ -957,11 +787,13 @@
             font-size: 13px;
             color: #cccccc;
           }
-
+          
           .chat-input {
             display: flex;
             gap: 8px;
-            margin-top: 8px;
+                        display: flex;
+            gap: 0px;
+            flex-direction: column;
           }
           
           .chat-input textarea {
@@ -977,6 +809,7 @@
             font-size: 14px;
             line-height: 1.5;
           }
+          
           
           .chat-input textarea:focus {
             outline: none;
@@ -1006,43 +839,29 @@
             cursor: not-allowed;
           }
           
-          .api-key-input {
-            width: 100%;
-            padding: 12px;
-            margin-bottom: 8px;
-            border: 1px solid #444444;
-            border-radius: 6px;
-            background-color: #2d2d2d;
-            color: #e0e0e0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            font-size: 14px;
-          }
-
-          .api-key-status {
-            font-size: 12px;
-            margin-top: 8px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          .message.loading {
+            opacity: 0.7;
           }
           
-          .api-key-status.valid {
-            color: #4ade80;
+          .message.loading::after {
+            content: '';
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            margin-left: 8px;
           }
           
-          .api-key-status.invalid {
-            color: #ff9999;
-          }
-
-          .api-key-section h2 {
-            color: #cccccc;
-            font-size: 12px;
-            font-weight: 500;
-            margin-bottom: 12px;
-            font-family: monospace;
+          @keyframes spin {
+            to { transform: rotate(360deg); }
           }
         </style>
 
         <div class="chat-container">
-          <div class="api-key-section" id="api-key-section">
+          <div class="api-key-section">
             <h2>OpenAI API Key Configuration</h2>
             <div class="api-key-input">
               <input 
@@ -1051,7 +870,6 @@
                 placeholder="Enter your OpenAI API key (sk-...)"
                 spellcheck="false"
               />
-              <button id="toggle-key-visibility" title="Toggle visibility">👁️</button>
             </div>
             <div class="api-key-status" id="api-key-status">Waiting for API key...</div>
             <button id="save-api-key">Save API Key</button>
@@ -1060,14 +878,7 @@
           <div class="chat-messages" id="chat-messages">
             <div class="message assistant-message">
               <div class="timestamp">Now</div>
-              <div class="content">Hello! I'm your Figma design assistant. I can help you with:
-• Design analysis and suggestions
-• Component organization
-• Layout improvements
-• Best practices
-• And more!
-
-What would you like help with today?</div>
+              <div class="content">Tsup Critter How can I help you today?</div>
             </div>
           </div>
 
@@ -1077,35 +888,25 @@ What would you like help with today?</div>
               placeholder="Type your message here... (Shift+Enter for new line)" 
               rows="2"
             ></textarea>
-            <button id="send-message" disabled>Send</button>
+
           </div>
+                      <button id="send-message" disabled>Send</button>
         </div>
 
         <script>
-          // Chat functionality
           const apiKeyInput = document.getElementById('openai-key');
           const saveApiKeyButton = document.getElementById('save-api-key');
           const chatInput = document.getElementById('chat-input');
           const sendMessageButton = document.getElementById('send-message');
           const chatMessages = document.getElementById('chat-messages');
-          const apiKeySection = document.getElementById('api-key-section');
           const apiKeyStatus = document.getElementById('api-key-status');
-          const toggleKeyVisibility = document.getElementById('toggle-key-visibility');
           
-          // Toggle API key visibility
-          toggleKeyVisibility.addEventListener('click', () => {
-            const type = apiKeyInput.type;
-            apiKeyInput.type = type === 'password' ? 'text' : 'password';
-            toggleKeyVisibility.textContent = type === 'password' ? '👁️‍🗨️' : '👁️';
-          });
-
-          // Validate API key format
           function validateApiKey(key) {
-            // Support both OpenAI (sk-...) and Anthropic (sk-proj-...) formats
-            return /^sk-(?:proj-)?[A-Za-z0-9-_]{32,}$/.test(key.trim());
+            const isValid = /^sk-(?:proj-)?[A-Za-z0-9-_]{32,}$/.test(key.trim());
+            console.log('[API Key Validation]', { isValid, keyLength: key.length });
+            return isValid;
           }
 
-          // Update API key status
           function updateApiKeyStatus(key) {
             if (!key) {
               apiKeyStatus.textContent = 'Please enter your API key';
@@ -1118,70 +919,37 @@ What would you like help with today?</div>
               ? 'Valid API key format' 
               : 'Invalid API key format. It should start with "sk-" or "sk-proj-" followed by at least 32 characters';
             apiKeyStatus.className = `api-key-status ${isValid ? 'valid' : 'invalid'}`;
+            
+            updateSendButtonState();
             return isValid;
           }
-          
-          // Load saved API key
-          (async function loadApiKey() {
-            try {
-              parent.postMessage({ 
-                pluginMessage: { 
-                  type: 'get-api-key'
-                }
-              }, '*');
-            } catch (error) {
-              console.error('Error loading API key:', error);
-            }
-          })();
-          
-          // Save API key
-          saveApiKeyButton.addEventListener('click', () => {
-            const apiKey = apiKeyInput.value.trim();
-            if (updateApiKeyStatus(apiKey)) {
-              parent.postMessage({ 
-                pluginMessage: { 
-                  type: 'save-api-key',
-                  key: apiKey
-                }
-              }, '*');
-              sendMessageButton.disabled = false;
-              addMessage('API key saved successfully! You can now start chatting.', 'assistant');
-            }
-          });
 
-          // Input validation
-          apiKeyInput.addEventListener('input', () => {
-            updateApiKeyStatus(apiKeyInput.value);
-          });
+          function updateSendButtonState() {
+            const hasValidKey = apiKeyInput.value.trim() && validateApiKey(apiKeyInput.value.trim());
+            const hasMessage = chatInput.value.trim().length > 0;
+            const shouldEnable = hasValidKey && hasMessage;
+            
+            sendMessageButton.disabled = !shouldEnable;
+            chatInput.disabled = !hasValidKey;
 
-          // Send message on button click or Enter (Shift+Enter for new line)
-          sendMessageButton.addEventListener('click', sendMessage);
-          chatInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              sendMessage();
+            if (shouldEnable) {
+              sendMessageButton.removeAttribute('disabled');
+            } else {
+              sendMessageButton.setAttribute('disabled', 'disabled');
             }
-          });
+          }
 
-          // Format message content with markdown-like syntax
           function formatMessageContent(text) {
-            // Format code blocks
             text = text.replace(/```([\s\S]*?)```/g, '<pre>$1</pre>');
-            
-            // Format inline code
             text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-            
-            // Format bullet points
             text = text.replace(/^[•*-]\s(.+)$/gm, '• $1');
-            
-            // Convert line breaks
             text = text.replace(/\n/g, '<br>');
-            
             return text;
           }
 
-          // Add message to chat
           function addMessage(text, role, isError = false) {
+            if (role !== 'user' && role !== 'assistant') return;
+
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}-message${isError ? ' error' : ''}`;
             
@@ -1200,7 +968,6 @@ What would you like help with today?</div>
             return messageDiv;
           }
 
-          // Show loading state
           function showLoadingMessage() {
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'message assistant-message loading';
@@ -1210,66 +977,103 @@ What would you like help with today?</div>
             return loadingDiv;
           }
 
-          // Handle message sending
           async function sendMessage() {
             const message = chatInput.value.trim();
+            
             if (!message) return;
-            
-            // Add user message
-            addMessage(message, 'user');
-            chatInput.value = '';
-            
-            // Show loading state
-            const loadingMessage = showLoadingMessage();
-            
-            // Disable input while waiting
-            chatInput.disabled = true;
-            sendMessageButton.disabled = true;
-            
+
             try {
-              // Send to OpenAI
+              addMessage(message, 'user');
+              chatInput.value = '';
+              chatInput.disabled = true;
+              sendMessageButton.disabled = true;
+              
+              showLoadingMessage();
+              
               parent.postMessage({ 
                 pluginMessage: { 
                   type: 'chat-message',
                   message: message
                 }
               }, '*');
-            } catch (error) {
-              // Remove loading message and show error
-              loadingMessage.remove();
-              addMessage('Error: Failed to send message. Please try again.', 'assistant', true);
               
-              // Re-enable input
+            } catch (error) {
+              console.error('[Send Error]', error);
+              addMessage(`Error: ${error.message}`, 'assistant', true);
               chatInput.disabled = false;
-              sendMessageButton.disabled = false;
+              updateSendButtonState();
             }
           }
 
-          // Listen for responses
+          (async function loadApiKey() {
+            try {
+              parent.postMessage({ 
+                pluginMessage: { 
+                  type: 'get-api-key'
+                }
+              }, '*');
+            } catch (error) {
+              console.error('[Load API Key Error]', error);
+            }
+          })();
+
+          saveApiKeyButton.addEventListener('click', () => {
+            const apiKey = apiKeyInput.value.trim();
+            
+            if (updateApiKeyStatus(apiKey)) {
+              parent.postMessage({ 
+                pluginMessage: { 
+                  type: 'save-api-key',
+                  key: apiKey
+                }
+              }, '*');
+              
+              chatInput.disabled = false;
+              updateSendButtonState();
+            }
+          });
+
+          apiKeyInput.addEventListener('input', () => {
+            const isValid = updateApiKeyStatus(apiKeyInput.value);
+            saveApiKeyButton.disabled = !isValid;
+          });
+
+          chatInput.addEventListener('input', updateSendButtonState);
+          chatInput.addEventListener('keyup', updateSendButtonState);
+          chatInput.addEventListener('change', updateSendButtonState);
+
+          sendMessageButton.addEventListener('click', sendMessage);
+
+          chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              sendMessage();
+            }
+          });
+
           window.addEventListener('message', (event) => {
             const message = event.data.pluginMessage;
+            console.log('[Received Message]', message);
             
-            if (message.type === 'api-key') {
+            if (message?.type === 'api-key') {
               if (message.key) {
                 apiKeyInput.value = message.key;
-                updateApiKeyStatus(message.key);
-                sendMessageButton.disabled = false;
+                const isValid = updateApiKeyStatus(message.key);
+                chatInput.disabled = !isValid;
+                updateSendButtonState();
               }
-            } else if (message.type === 'chat-response') {
-              // Remove any loading messages
+            } else if (message?.type === 'chat-response') {
               const loadingMessages = chatMessages.getElementsByClassName('loading');
               Array.from(loadingMessages).forEach(msg => msg.remove());
               
-              // Add the response
               if (message.error) {
                 addMessage(message.error, 'assistant', true);
               } else {
                 addMessage(message.response, 'assistant');
               }
               
-              // Re-enable input
               chatInput.disabled = false;
-              sendMessageButton.disabled = false;
+              updateSendButtonState();
             }
           });
         </script>
@@ -1284,6 +1088,7 @@ What would you like help with today?</div>
         serverPort: 3055,
         pendingRequests: new Map(),
         channel: null,
+        channelJoined: false  // New flag to track channel join status
       };
 
       // UI Elements
@@ -1306,22 +1111,26 @@ What would you like help with today?</div>
       // Initialize UI
       function updateConnectionStatus(isConnected, message) {
         state.connected = isConnected;
-        connectionStatus.innerHTML =
-          message ||
-          (isConnected
-            ? "Connected to Cursor MCP server"
-            : "Not connected to Cursor MCP server");
-        connectionStatus.className = `status ${
-          isConnected ? "connected" : "disconnected"
-        }`;
+        const statusText = message || (isConnected ? "Connected to Cursor MCP server" : "Not connected to Cursor MCP server");
+        const channelInfo = state.channel ? ` (Channel: ${state.channel})` : '';
+        const joinStatus = state.channelJoined ? ' [Joined]' : '';
+        
+        connectionStatus.innerHTML = statusText + channelInfo + joinStatus;
+        connectionStatus.className = `status ${isConnected ? "connected" : "disconnected"}`;
 
         connectButton.disabled = isConnected;
         disconnectButton.disabled = !isConnected;
         portInput.disabled = isConnected;
 
+        // Update chat input state based on connection
+        if (chatInput) {
+          const apiKeyValid = apiKeyInput && apiKeyInput.value.trim().startsWith('sk-');
+          chatInput.disabled = !(isConnected && state.channelJoined && apiKeyValid);
+          updateSendButtonState();
+        }
+
         // Add log entry for connection status
-        addLogEntry(message || (isConnected ? "Connected to Cursor MCP server" : "Not connected to Cursor MCP server"), 
-          isConnected ? 'success' : 'error');
+        addLogEntry(statusText + channelInfo + joinStatus, isConnected ? 'success' : 'error');
       }
 
       // Connect to WebSocket server
@@ -1355,17 +1164,23 @@ What would you like help with today?</div>
             try {
               const data = JSON.parse(event.data);
               console.log("Received message:", data);
+              debugLog('WebSocket Message', { type: data.type, channel: data.channel });
 
               if (data.type === "system") {
                 // Successfully joined channel
                 if (data.message && data.message.result) {
                   state.connected = true;
+                  state.channelJoined = true;  // Set channel joined flag
                   const channelName = data.channel;
                   updateConnectionStatus(
                     true,
                     `Connected to server on port ${port} in channel: <strong>${channelName}</strong>`
                   );
                   addLogEntry(`Successfully joined channel: ${channelName}`, 'success');
+                  debugLog('Channel Joined', { channel: channelName });
+
+                  // Update send button state after joining channel
+                  updateSendButtonState();
 
                   // Notify the plugin code
                   parent.postMessage(
@@ -1907,6 +1722,20 @@ What would you like help with today?</div>
               }
             }
             break;
+
+            case 'tiles-generated':
+              if (msg.success) {
+                addLogEntry('Tiles generated successfully!', 'success');
+              } else {
+                addLogEntry(`Error generating tiles: ${msg.error}`, 'error');
+              }
+              break;
+
+            case 'export-atlas-json':
+              console.log('Atlas JSON Data:');
+              console.log(JSON.stringify(msg.data, null, 2));
+              addLogEntry('Atlas JSON generated successfully!', 'success');
+            break;
         }
       };
 
@@ -2427,6 +2256,12 @@ What would you like help with today?</div>
               } else {
                 addLogEntry(`Error generating tiles: ${msg.error}`, 'error');
               }
+              break;
+
+            case 'export-atlas-json':
+              console.log('Atlas JSON Data:');
+              console.log(JSON.stringify(msg.data, null, 2));
+              addLogEntry('Atlas JSON generated successfully!', 'success');
               break;
           }
         });
