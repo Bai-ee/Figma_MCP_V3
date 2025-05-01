@@ -3644,95 +3644,85 @@ async function createAtlas(params = {}) {
     throw new Error('All selected items must be frames');
   }
 
+  // Store gridSize param but don't use it for layout
   const gridSize = params.gridSize || 8;
   
-  // First pass: snap all frame dimensions to grid and create frame objects
+  // Create frame objects with original dimensions (no snapping)
   const frames = selection.map(frame => ({
     node: frame,
-    width: Math.ceil(frame.width / gridSize) * gridSize,
-    height: Math.ceil(frame.height / gridSize) * gridSize,
+    width: frame.width,
+    height: frame.height,
     x: 0,
     y: 0,
-    placed: false
+    originalX: frame.x,
+    originalY: frame.y
   }));
 
-  // Sort frames by height descending for better packing
-  frames.sort((a, b) => b.height - a.height);
+  // Find the largest frame by area
+  const largestFrame = frames.reduce((largest, current) => {
+    const currentArea = current.width * current.height;
+    const largestArea = largest.width * largest.height;
+    return currentArea > largestArea ? current : largest;
+  }, frames[0]);
 
-  // Initialize atlas dimensions with reasonable starting size
-  let atlasWidth = Math.ceil(Math.sqrt(frames.reduce((sum, frame) => sum + frame.width * frame.height, 0)) * 1.1);
-  let atlasHeight = 0;
-  let needsRepack = true;
+  console.log('📏 Largest frame:', {
+    name: largestFrame.node.name,
+    width: largestFrame.width,
+    height: largestFrame.height,
+    position: { x: largestFrame.originalX, y: largestFrame.originalY }
+  });
 
-  while (needsRepack) {
-    // Reset placement flags
-    frames.forEach(frame => frame.placed = false);
-    atlasHeight = 0;
-    needsRepack = false;
+  // Simple shelf-based bin packing algorithm
+  let currentX = 0;
+  let currentY = 0;
+  let shelfHeight = 0;
+  let maxWidth = 0;
+  let maxHeight = 0;
 
-    // Try to place each frame
-    for (const frame of frames) {
-      let placed = false;
-      let bestY = Infinity;
-      let bestX = 0;
-
-      // Find the best position for this frame
-      for (let y = 0; y <= atlasHeight; y += gridSize) {
-        xLoop: for (let x = 0; x <= atlasWidth - frame.width; x += gridSize) {
-          // Check if this position overlaps with any placed frames
-          for (const placedFrame of frames.filter(f => f.placed)) {
-            if (!(x + frame.width <= placedFrame.x || x >= placedFrame.x + placedFrame.width ||
-                  y + frame.height <= placedFrame.y || y >= placedFrame.y + placedFrame.height)) {
-              continue xLoop;
-            }
-          }
-
-          // Valid position found
-          if (y < bestY) {
-            bestY = y;
-            bestX = x;
-            placed = true;
-          }
-        }
-      }
-
-      if (placed) {
-        frame.x = bestX;
-        frame.y = bestY;
-        frame.placed = true;
-        atlasHeight = Math.max(atlasHeight, bestY + frame.height);
-      } else {
-        // Couldn't place frame, need to increase atlas width and try again
-        atlasWidth = Math.ceil(atlasWidth * 1.2);
-        needsRepack = true;
-        break;
-      }
+  // Place each frame using shelf algorithm
+  frames.forEach(frame => {
+    // If frame doesn't fit on current shelf, start a new shelf
+    if (currentX + frame.width > maxWidth) {
+      currentX = 0;
+      currentY += shelfHeight;
+      shelfHeight = 0;
     }
+
+    // Place frame at current position
+    frame.x = currentX;
+    frame.y = currentY;
+    console.log("Placing " + frame.node.name + " at (" + frame.x + "," + frame.y + ")");
+
+    // Update shelf height if this frame is taller
+    shelfHeight = Math.max(shelfHeight, frame.height);
+    
+    // Update atlas bounds
+    maxWidth = Math.max(maxWidth, currentX + frame.width);
+    maxHeight = Math.max(maxHeight, currentY + frame.height);
+
+    // Move x position for next frame
+    currentX += frame.width;
+  });
+
+  // Check if atlas exceeds maximum dimensions
+  const MAX_ATLAS_SIZE = 2048;
+  if (maxWidth > MAX_ATLAS_SIZE || maxHeight > MAX_ATLAS_SIZE) {
+    console.error(`❌ Error: Atlas size (${maxWidth}x${maxHeight}) exceeds maximum dimensions of ${MAX_ATLAS_SIZE}x${MAX_ATLAS_SIZE}`);
+    throw new Error(`Atlas size (${maxWidth}x${maxHeight}) exceeds maximum dimensions of ${MAX_ATLAS_SIZE}x${MAX_ATLAS_SIZE}`);
   }
 
-  // Create new atlas frame with calculated dimensions
-  console.log('📦 Creating atlas frame with dimensions:', { width: atlasWidth, height: atlasHeight });
+  // Create new atlas frame with exact dimensions
+  console.log('📦 Creating atlas frame with dimensions:', { width: maxWidth, height: maxHeight });
   const atlas = figma.createFrame();
   atlas.name = 'Sprite Atlas';
-  atlas.resize(atlasWidth, atlasHeight);
+  atlas.resize(maxWidth, maxHeight);
   
   // Disable auto-layout for precise positioning
   atlas.layoutMode = 'NONE';
   
-  // Position atlas at the center of the viewport
-  const viewport = figma.viewport;
-  atlas.x = viewport.center.x - (atlasWidth / 2);
-  atlas.y = viewport.center.y - (atlasHeight / 2);
-
-  // Set up pixel grid
-  console.log(`📏 Setting up ${gridSize}x${gridSize} pixel grid...`);
-  const grid = {
-    pattern: 'GRID',
-    sectionSize: gridSize,
-    visible: true,
-    color: { r: 1, g: 0, b: 0, a: 1 }
-  };
-  atlas.layoutGrids = [grid];
+  // Position atlas at the same position as the largest frame
+  atlas.x = largestFrame.originalX;
+  atlas.y = largestFrame.originalY;
 
   // Add all frames to the atlas at their calculated positions
   console.log('➡️ Adding frames to atlas...');
@@ -3744,7 +3734,7 @@ async function createAtlas(params = {}) {
 
   // Select the atlas and ensure it's visible in the viewport
   figma.currentPage.selection = [atlas];
-  figma.viewport.scrollAndZoomIntoView([atlas]);
+  // figma.viewport.scrollAndZoomIntoView([atlas]); // Removed to prevent viewport changes
 
   // Build frames array for JSON
   const framesArr = frames.map((frame) => ({
@@ -3774,8 +3764,8 @@ async function createAtlas(params = {}) {
     image: "atlas.png",
     format: "RGBA8888",
     size: {
-      w: Math.round(atlasWidth),
-      h: Math.round(atlasHeight)
+      w: Math.round(maxWidth),
+      h: Math.round(maxHeight)
     },
     scale: 1,
     frames: framesArr
@@ -3813,8 +3803,8 @@ async function createAtlas(params = {}) {
     atlas: {
       id: atlas.id,
       name: atlas.name,
-      width: atlasWidth,
-      height: atlasHeight,
+      width: maxWidth,
+      height: maxHeight,
       gridSize: gridSize,
       framesCount: selection.length,
       json: atlasJson
@@ -3894,10 +3884,11 @@ async function frameUp() {
   // Store the original parent for insertion order
   const originalParent = selection[0].parent;
   const nextSibling = selection[0].nextSibling;
+  const parentName = selection[0].parent.name;
 
   // Create a frame that will contain all selected items
   const frame = figma.createFrame();
-  frame.name = "Aspect Frame";
+  frame.name = parentName;
   
   // Calculate the bounding box of all selected items
   let minX = Infinity;
@@ -3972,32 +3963,36 @@ async function exportTileMap(params) {
   
   if (selection.length !== 1 || selection[0].type !== 'FRAME') {
     console.error('Please select a single frame to export');
-    return;
+    return {
+      success: false,
+      error: 'Please select a single frame to export'
+    };
   }
 
   const selectedFrame = selection[0];
   logStep('📋 Selected frame', `${selectedFrame.name}`);
 
-  const TILE_SIZE = 32;
+  const TILE_SIZE = params.gridSize || 32;
   const WIDTH = Math.ceil(selectedFrame.width / TILE_SIZE);
   const HEIGHT = Math.ceil(selectedFrame.height / TILE_SIZE);
 
-  // Create empty ground layer data
+  // Create empty ground layer data with proper dimensions
   const groundLayerData = new Array(WIDTH * HEIGHT).fill(0);
 
-  // Convert children to collision objects
+  // Convert children to collision objects with complete properties
   const objects = selectedFrame.children.map((child, index) => {
     const bounds = child.absoluteBoundingBox;
     return {
       id: index + 1,
       name: child.name || `Object ${index + 1}`,
-      type: "",
-      x: bounds.x - selectedFrame.absoluteBoundingBox.x,
-      y: bounds.y - selectedFrame.absoluteBoundingBox.y,
-      width: bounds.width,
-      height: bounds.height,
-      rotation: 0,
-      visible: true
+      type: child.type.toLowerCase(),
+      x: Math.round(bounds.x - selectedFrame.absoluteBoundingBox.x),
+      y: Math.round(bounds.y - selectedFrame.absoluteBoundingBox.y),
+      width: Math.round(bounds.width),
+      height: Math.round(bounds.height),
+      rotation: child.rotation || 0,
+      visible: child.visible,
+      properties: {}
     };
   });
 
@@ -4048,61 +4043,19 @@ async function exportTileMap(params) {
         tileheight: TILE_SIZE,
         spacing: 0,
         margin: 0,
-        image: "tileset_test.png",
-        columns: null,
-        tilecount: null
+        image: "tileset.png",
+        imagewidth: selectedFrame.width,
+        imageheight: selectedFrame.height,
+        columns: WIDTH,
+        tilecount: WIDTH * HEIGHT
       }
     ]
   };
 
-  // Create a custom replacer function to handle array formatting
-  const customReplacer = (key, value) => {
-    return value;
-  };
+  // Log the complete map data for debugging
+  console.log('Generated Tile Map Data:', JSON.stringify(mapData, null, 2));
 
-  // Create a custom formatter function
-  const customFormatter = (obj, indent = 0) => {
-    const spaces = ' '.repeat(indent);
-    
-    if (Array.isArray(obj)) {
-      // Special handling for data array in tilelayer
-      if (obj === groundLayerData) {
-        return `[${obj.join(',')}]`;
-      }
-      
-      // Format other arrays with items on separate lines
-      const items = obj.map(item => 
-        typeof item === 'object' && item !== null
-          ? `${spaces}  ${JSON.stringify(item, customReplacer, 2).replace(/^/gm, ' '.repeat(indent + 2))}`
-          : `${spaces}  ${JSON.stringify(item)}`
-      ).join(',\n');
-      
-      return `[\n${items}\n${spaces}]`;
-    }
-    
-    if (typeof obj === 'object' && obj !== null) {
-      const entries = Object.entries(obj);
-      const formatted = entries.map(([k, v]) => {
-        const value = typeof v === 'object' && v !== null
-          ? customFormatter(v, indent + 2)
-          : JSON.stringify(v);
-        return `${spaces}  "${k}": ${value}`;
-      }).join(',\n');
-      
-      return `{\n${formatted}\n${spaces}}`;
-    }
-    
-    return JSON.stringify(obj);
-  };
-
-  // Format the map data using custom formatter
-  const formattedJson = customFormatter(mapData);
-
-  // Log the formatted map data
-  console.log('Generated Tile Map Data:');
-  console.log(formattedJson);
-
-  // Return the result
+  // Return the complete result
   return {
     success: true,
     mapData: mapData
