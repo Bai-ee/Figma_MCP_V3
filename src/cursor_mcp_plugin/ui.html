@@ -226,6 +226,116 @@
         background-color: #2d2d2d;
         border-radius: 4px;
       }
+
+      .log-container {
+        max-height: 300px;
+        overflow-y: auto;
+        background-color: #1e1e1e;
+        border: 1px solid #444444;
+        border-radius: 4px;
+        padding: 8px;
+        margin-top: 8px;
+        font-family: monospace;
+        font-size: 12px;
+      }
+
+      .log-entry {
+        margin: 4px 0;
+        padding: 4px 8px;
+        border-radius: 4px;
+        background-color: #2d2d2d;
+        border-left: 3px solid transparent;
+      }
+
+      .log-entry.info {
+        border-left-color: #18a0fb;
+      }
+
+      .log-entry.success {
+        border-left-color: #4ade80;
+      }
+
+      .log-entry.error {
+        border-left-color: #ff4444;
+      }
+
+      .log-entry .timestamp {
+        color: #666666;
+        font-size: 10px;
+        margin-right: 8px;
+      }
+
+      .log-entry .structured-data {
+        margin: 8px 0;
+        padding: 8px;
+        background-color: #1e1e1e;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        overflow-x: auto;
+        color: #e0e0e0;
+      }
+
+      .log-entry pre.structured-data {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #333333;
+      }
+
+      .log-entry button {
+        margin-top: 8px;
+        padding: 4px 12px;
+        background-color: #18a0fb;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: background-color 0.2s;
+      }
+
+      .log-entry button:hover {
+        background-color: #0d8ee9;
+      }
+
+      .log-entry button:active {
+        background-color: #0b7fd0;
+      }
+
+      /* ... existing styles ... */
+      .log-entry {
+        padding: 4px 8px;
+        border-bottom: 1px solid #eee;
+        font-family: monospace;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+
+      .log-entry.error {
+        color: #ff4444;
+        background-color: rgba(255, 0, 0, 0.1);
+      }
+
+      .log-entry .timestamp {
+        color: #666;
+        margin-right: 8px;
+        font-size: 0.9em;
+      }
+
+      .log-entry .structured-data {
+        margin: 4px 0;
+        padding: 8px;
+        background-color: rgba(0, 0, 0, 0.05);
+        border-radius: 4px;
+        font-size: 12px;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+
+      .log-entry pre {
+        margin: 0;
+        white-space: pre-wrap;
+      }
+      /* ... existing styles ... */
     </style>
     <script>
       // Debug logging function
@@ -509,14 +619,14 @@
           <button id="convertToSpriteFrame" class="button">Convert to Sprite Frame</button>
           
           <h2>Create Atlas</h2>
-          <label>Create Atlas/DL JSON selecting multiple frames</label>
+          <label>Create Atlas/View JSON selecting multiple frames</label>
           <button id="createAtlas" class="button">Create Atlas</button>
           
           <h2>Export Tile Map</h2>
-          <label>DL Tile Map JSON with map and item coordinates</label>
+          <label>View Tile Map JSON with map and item coordinates</label>
           <button id="exportTileMap" class="button">Export Tile Map</button>
 
-          <h2>Creaate Tile Map</h2>
+          <h2>Create Tile Map</h2>
           <div class="form-group">
             <label for="frameWidth">Frame Width (px):</label>
             <input type="number" id="frameWidth" value="1200" min="1">
@@ -532,7 +642,14 @@
           <button id="createGridFrame" class="button">Create Tile Map</button>
           
           <div style="margin: 20px 0; border-bottom: 1px solid #444;"></div>
-          <!-- <div id="tools-log" class="log-container"></div> -->
+
+            <h2>Console Logs & JSON Exports</h2>
+          <label>View JSON from exports and troubleshoot here</label>
+                    <button id="clearLogs" class="button">Clear Logs</button>
+
+          <div id="tools-log" class="log-container"></div>
+
+
           
           <!-- <h2>Analyze</h2>
           <div class="tool-group">
@@ -758,7 +875,7 @@
           }
           
           .assistant-message {
-            background-color: #1a472a;
+            background-color: #131313;
             margin-right: 40px;
           }
           
@@ -878,7 +995,7 @@
           <div class="chat-messages" id="chat-messages">
             <div class="message assistant-message">
               <div class="timestamp">Now</div>
-              <div class="content">Tsup Critter How can I help you today?</div>
+              <div class="content">Tsup...</div>
             </div>
           </div>
 
@@ -1396,52 +1513,116 @@
       const originalConsoleError = console.error;
       const originalConsoleInfo = console.info;
 
+      function stringifyWithArrays(obj) {
+        if (typeof obj !== 'object' || obj === null) {
+          return obj;
+        }
+        return JSON.stringify(obj, (key, value) => {
+          if (Array.isArray(value)) {
+            return value;
+          }
+          if (typeof value === 'object' && value !== null) {
+            const simpleObj = {};
+            Object.keys(value).forEach(k => {
+              simpleObj[k] = value[k];
+            });
+            return simpleObj;
+          }
+          return value;
+        }, 2);
+      }
+
       console.log = function() {
         // Call original console.log
         originalConsoleLog.apply(console, arguments);
         
         // Convert all arguments to strings and join them
         const message = Array.from(arguments)
-          .map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg))
+          .map(arg => {
+            if (typeof arg === 'object' && arg !== null) {
+              return stringifyWithArrays(arg);
+            }
+            return String(arg);
+          })
           .join(' ');
         
-        // Add to appropriate log container based on active tab
-        const activeTab = document.querySelector('.tab.active');
-        if (activeTab) {
-          const logTarget = activeTab.id === 'tab-tile' ? 'tile-log' : 'tools-log';
-          addLogEntry(message, 'info', logTarget);
-        }
+        // Add to both log containers to ensure visibility
+        addLogEntry(message, 'info', 'tools-log');
+        addLogEntry(message, 'info', 'tile-log');
       };
 
       console.error = function() {
-        // Call original console.error
         originalConsoleError.apply(console, arguments);
         
         const message = Array.from(arguments)
-          .map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg))
+          .map(arg => {
+            if (typeof arg === 'object' && arg !== null) {
+              return stringifyWithArrays(arg);
+            }
+            return String(arg);
+          })
           .join(' ');
         
-        const activeTab = document.querySelector('.tab.active');
-        if (activeTab) {
-          const logTarget = activeTab.id === 'tab-tile' ? 'tile-log' : 'tools-log';
-          addLogEntry(message, 'error', logTarget);
-        }
+        addLogEntry(message, 'error', 'tools-log');
+        addLogEntry(message, 'error', 'tile-log');
       };
 
       console.info = function() {
-        // Call original console.info
         originalConsoleInfo.apply(console, arguments);
         
         const message = Array.from(arguments)
-          .map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg))
+          .map(arg => {
+            if (typeof arg === 'object' && arg !== null) {
+              return stringifyWithArrays(arg);
+            }
+            return String(arg);
+          })
           .join(' ');
         
-        const activeTab = document.querySelector('.tab.active');
-        if (activeTab) {
-          const logTarget = activeTab.id === 'tab-tile' ? 'tile-log' : 'tools-log';
-          addLogEntry(message, 'info', logTarget);
-        }
+        addLogEntry(message, 'info', 'tools-log');
+        addLogEntry(message, 'info', 'tile-log');
       };
+
+      // Enhanced log entry function
+      function addLogEntry(message, type = 'info', target = 'tools-log', shouldAutoScroll = false) {
+        const logContainer = document.getElementById(target);
+        if (!logContainer) return;
+
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${type}`;
+        
+        const timestamp = document.createElement('span');
+        timestamp.className = 'timestamp';
+        timestamp.textContent = new Date().toLocaleTimeString();
+        entry.appendChild(timestamp);
+
+        // Handle objects and arrays
+        if (typeof message === 'string' && (message.startsWith('{') || message.startsWith('['))) {
+          try {
+            const parsed = JSON.parse(message);
+            const content = document.createElement('pre');
+            content.className = 'structured-data';
+            content.textContent = JSON.stringify(parsed, null, 2);
+            entry.appendChild(content);
+          } catch (e) {
+            entry.appendChild(document.createTextNode(message));
+          }
+        } else {
+          entry.appendChild(document.createTextNode(message));
+        }
+        
+        logContainer.appendChild(entry);
+        
+        // Keep only the last 100 entries
+        while (logContainer.children.length > 100) {
+          logContainer.removeChild(logContainer.firstChild);
+        }
+        
+        // Only scroll into view if explicitly requested
+        if (shouldAutoScroll) {
+          entry.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+      }
 
       // Tab switching
       tabs.forEach((tab) => {
@@ -1480,76 +1661,6 @@
           }
         }
         return formatted;
-      }
-
-      // Enhanced log entry function
-      function addLogEntry(message, type = 'info', target = 'tools-log') {
-        const logContainer = document.getElementById(target);
-        if (!logContainer) return;
-
-        // Filter out debug messages and system info
-        if (typeof message === 'string') {
-          if (message.startsWith('[DEBUG]') || 
-              message.startsWith('[INFO]') || 
-              message.includes('socket') || 
-              message.includes('WebSocket')) {
-            return;
-          }
-        }
-
-        const entry = document.createElement('div');
-        entry.className = `log-entry ${type}`;
-        
-        const timestamp = document.createElement('span');
-        timestamp.className = 'timestamp';
-        timestamp.textContent = new Date().toLocaleTimeString();
-        entry.appendChild(timestamp);
-
-        // Format the message based on type
-        if (typeof message === 'string') {
-          // Clean up the message
-          let cleanMessage = message
-            .replace(/\[.*?\]/g, '')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-          // Handle JSON strings
-          if (message.includes('{') && message.includes('}')) {
-            try {
-              const jsonStart = message.indexOf('{');
-              const prefix = message.substring(0, jsonStart).trim();
-              const jsonStr = message.substring(jsonStart);
-              const jsonData = JSON.parse(jsonStr);
-              
-              entry.appendChild(document.createTextNode(prefix + ' '));
-              
-              const jsonContent = document.createElement('pre');
-              jsonContent.className = 'structured-data';
-              jsonContent.textContent = JSON.stringify(formatObject(jsonData), null, 2);
-              entry.appendChild(jsonContent);
-            } catch (e) {
-              entry.appendChild(document.createTextNode(cleanMessage));
-            }
-          } else {
-            entry.appendChild(document.createTextNode(cleanMessage));
-          }
-        } else if (typeof message === 'object') {
-          const formatted = formatObject(message);
-          const jsonContent = document.createElement('pre');
-          jsonContent.className = 'structured-data';
-          jsonContent.textContent = JSON.stringify(formatted, null, 2);
-          entry.appendChild(jsonContent);
-        }
-        
-        logContainer.appendChild(entry);
-        
-        // Keep only the last 50 entries
-        while (logContainer.children.length > 50) {
-          logContainer.removeChild(logContainer.firstChild);
-        }
-        
-        // Scroll to the latest entry
-        entry.scrollIntoView({ behavior: 'smooth', block: 'end' });
       }
 
       // Connect to server
@@ -1664,62 +1775,51 @@
             break;
           case "command-result":
             if (message.command === 'export-tile-map') {
-              console.log('Raw map data received:', message.result);
-              
-              if (message.result.success && message.result.mapData) {
-                try {
-                  // Create a custom formatter function for Tiled-style JSON
-                  const customFormatter = (obj, indent = 0) => {
-                    const spaces = ' '.repeat(indent);
-                    
-                    if (Array.isArray(obj)) {
-                      // Special handling for data array in tilelayer
-                      if (obj.length > 0 && typeof obj[0] === 'number') {
-                        return `[${obj.join(',')}]`;
-                      }
-                      
-                      // Format other arrays with items on separate lines
-                      const items = obj.map(item => 
-                        typeof item === 'object' && item !== null
-                          ? `${spaces}  ${JSON.stringify(item, null, 2).replace(/^/gm, ' '.repeat(indent + 2))}`
-                          : `${spaces}  ${JSON.stringify(item)}`
-                      ).join(',\n');
-                      
-                      return `[\n${items}\n${spaces}]`;
+                addLogEntry('Raw map data received:', 'info');
+                
+                if (message.result.success && message.result.mapData) {
+                    try {
+                        // Create a pre element for formatted display
+                        const logEntry = document.createElement('div');
+                        logEntry.className = 'log-entry';
+                        
+                        const timestamp = document.createElement('span');
+                        timestamp.className = 'timestamp';
+                        timestamp.textContent = new Date().toLocaleTimeString();
+                        logEntry.appendChild(timestamp);
+                        
+                        const content = document.createElement('pre');
+                        content.className = 'structured-data';
+                        // Use JSON.stringify directly without any custom replacer
+                        content.textContent = JSON.stringify(message.result.mapData, null, 2);
+                        logEntry.appendChild(content);
+                        
+                        // Add to tools-log container
+                        const logContainer = document.getElementById('tools-log');
+                        if (logContainer) {
+                            logContainer.appendChild(logEntry);
+                            logEntry.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                        }
+                        
+                        // Create download link with the full data
+                        const blob = new Blob([JSON.stringify(message.result.mapData, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `tilemap-${new Date().toISOString().slice(0,19).replace(/[:-]/g, '')}.json`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                        
+                        addLogEntry('✅ Tile Map JSON exported successfully!', 'success');
+                    } catch (error) {
+                        addLogEntry(`❌ Error processing map data: ${error.message}`, 'error');
+                        console.error('Full error:', error);
                     }
-                    
-                    if (typeof obj === 'object' && obj !== null) {
-                      const entries = Object.entries(obj);
-                      const formatted = entries.map(([k, v]) => {
-                        const value = typeof v === 'object' && v !== null
-                          ? customFormatter(v, indent + 2)
-                          : JSON.stringify(v);
-                        return `${spaces}  "${k}": ${value}`;
-                      }).join(',\n');
-                      
-                      return `{\n${formatted}\n${spaces}}`;
-                    }
-                    
-                    return JSON.stringify(obj);
-                  };
-
-                  // Format the JSON data using custom formatter
-                  const formattedJson = customFormatter(message.result.mapData);
-                  
-                  // Create and trigger download
-                  const blob = new Blob([formattedJson], { type: 'application/json' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `tilemap-${new Date().toISOString().slice(0,19).replace(/[:-]/g, '')}.json`;
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
-                } catch (error) {
-                  console.error('Error processing map data:', error);
+                } else {
+                    addLogEntry('❌ No map data received or export failed', 'error');
                 }
-              }
             }
             break;
 
@@ -1732,10 +1832,50 @@
               break;
 
             case 'export-atlas-json':
-              console.log('Atlas JSON Data:');
-              console.log(JSON.stringify(msg.data, null, 2));
-              addLogEntry('Atlas JSON generated successfully!', 'success');
-            break;
+              try {
+                  const atlasData = msg.data;
+                  addLogEntry('Atlas JSON Data:', 'info');
+                  
+                  // Format the JSON data for display
+                  const formattedJson = JSON.stringify(atlasData, null, 2);
+                  
+                  // Create a pre element for formatted display
+                  const logEntry = document.createElement('div');
+                  logEntry.className = 'log-entry';
+                  
+                  const timestamp = document.createElement('span');
+                  timestamp.className = 'timestamp';
+                  timestamp.textContent = new Date().toLocaleTimeString();
+                  logEntry.appendChild(timestamp);
+                  
+                  const content = document.createElement('pre');
+                  content.className = 'structured-data';
+                  content.textContent = formattedJson;
+                  logEntry.appendChild(content);
+                  
+                  // Add to tools-log container
+                  const logContainer = document.getElementById('tools-log');
+                  if (logContainer) {
+                      logContainer.appendChild(logEntry);
+                      logEntry.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                  }
+                  
+                  // Create download link for Atlas JSON
+                  const blob = new Blob([formattedJson], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `atlas-${new Date().toISOString().slice(0,19).replace(/[:-]/g, '')}.json`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                  
+                  addLogEntry('✅ Atlas JSON generated and exported successfully!', 'success');
+              } catch (error) {
+                  addLogEntry(`❌ Error processing Atlas JSON: ${error.message}`, 'error');
+              }
+              break;
         }
       };
 
@@ -1774,6 +1914,26 @@
       document.head.appendChild(style);
 
       document.addEventListener('DOMContentLoaded', () => {
+        // Add clear logs button handler
+        const clearLogsBtn = document.getElementById('clearLogs');
+        if (clearLogsBtn) {
+          clearLogsBtn.onclick = () => {
+            // Clear both log containers
+            const toolsLog = document.getElementById('tools-log');
+            const tileLog = document.getElementById('tile-log');
+            
+            if (toolsLog) {
+              toolsLog.innerHTML = '';
+              addLogEntry('Logs cleared', 'info', 'tools-log', false);
+            }
+            
+            if (tileLog) {
+              tileLog.innerHTML = '';
+              addLogEntry('Logs cleared', 'info', 'tile-log', false);
+            }
+          };
+        }
+
         // Tab handling
         const tabs = document.querySelectorAll('.tab');
         const contents = document.querySelectorAll('.tab-content');
@@ -2175,7 +2335,7 @@
         if (createAtlasBtn) {
           createAtlasBtn.onclick = () => {
             const gridSize = parseInt(document.getElementById('selectionGridSize').value);
-            addLogEntry('Creating atlas from selected frames...', 'info');
+            addLogEntry('Creating atlas from selected frames...', 'info', 'tools-log', true); // Add auto-scroll
             parent.postMessage({ 
               pluginMessage: { 
                 type: 'execute-command',
@@ -2286,6 +2446,7 @@
         if (exportTileMapBtn) {
           exportTileMapBtn.onclick = () => {
             const gridSize = parseInt(document.getElementById('selectionGridSize').value);
+            addLogEntry('Exporting tile map...', 'info', 'tools-log', true); // Add auto-scroll
             const command = {
               type: 'execute-command',
               command: 'export-tile-map',
@@ -2363,6 +2524,99 @@
           }, 300);
         }, 3000);
       }
-            </script>
-          </body>
-        </html>
+
+      function addStructuredLogEntry(data, type = 'info') {
+        const logContainer = document.getElementById('tools-log');
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${type}`;
+        
+        const timestamp = document.createElement('span');
+        timestamp.className = 'timestamp';
+        timestamp.textContent = new Date().toLocaleTimeString();
+        
+        const content = document.createElement('pre');
+        content.className = 'structured-data';
+        content.textContent = JSON.stringify(data, null, 2);
+        
+        const downloadBtn = document.createElement('button');
+        downloadBtn.textContent = 'Download JSON';
+        downloadBtn.onclick = () => downloadJSON(data);
+        
+        entry.appendChild(timestamp);
+        entry.appendChild(content);
+        entry.appendChild(downloadBtn);
+        
+        logContainer.appendChild(entry);
+        logContainer.scrollTop = logContainer.scrollHeight;
+      }
+
+      function downloadJSON(data) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `export_${timestamp}.json`;
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      // Update message handlers for export functions
+      window.onmessage = async (event) => {
+        const msg = event.data.pluginMessage;
+        if (!msg) return;
+
+        switch (msg.type) {
+          case 'export-tile-map':
+            if (message.result.success) {
+              const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+              const mapData = message.result.mapData;
+              
+              // Format the map data with array preservation
+              const formattedData = JSON.stringify(mapData, (key, value) => {
+                if (Array.isArray(value)) {
+                  return value;
+                }
+                return value;
+              }, 2);
+              
+              // Create download link
+              const blob = new Blob([formattedData], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `tilemap-${timestamp}.json`;
+              
+              // Add success message with download link
+              const successMessage = document.createElement('div');
+              successMessage.innerHTML = `
+                <p>✅ Tile map exported successfully! <a href="${url}" download="tilemap-${timestamp}.json">Download JSON</a></p>
+                <pre style="max-height: 400px; overflow: auto; background: #f5f5f5; padding: 10px; border-radius: 4px;">${formattedData}</pre>
+              `;
+              
+              const logContainer = document.getElementById('tile-log');
+              logContainer.appendChild(successMessage);
+              
+              // Clean up URL object
+              setTimeout(() => URL.revokeObjectURL(url), 0);
+            } else {
+              console.error('Failed to export tile map:', message.result.error);
+            }
+            break;
+          case 'export-atlas':
+            try {
+              addStructuredLogEntry(msg.atlas, 'success');
+            } catch (error) {
+              addStructuredLogEntry({ error: error.message }, 'error');
+            }
+            break;
+          // ... existing message handlers ...
+        }
+      };
+    </script>
+  </body>
+</html>
