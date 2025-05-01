@@ -1,6 +1,6 @@
 {
-  "name": "Cursor MCP Plugin",
-  "id": "cursor-mcp-plugin",
+  "name": "Critter Tools",
+  "id": "critter-tools",
   "api": "1.0.0",
   "main": "code.js",
   "ui": "ui.html",
@@ -20,6 +20,5 @@
     ]
   },
   "documentAccess": "dynamic-page",
-  "enableProposedApi": true,
   "enablePrivatePluginApi": true
 }
