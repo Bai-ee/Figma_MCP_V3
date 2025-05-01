@@ -3813,7 +3813,7 @@ async function createAtlas(params = {}) {
 }
 
 async function convertToBasicFrame(params = {}) {
-  console.log('🔄 Converting selection to basic frame...', params);
+  console.log('🔄 Converting selection to basic frame...');
   
   // Get current selection
   const selection = figma.currentPage.selection;
@@ -3824,54 +3824,301 @@ async function convertToBasicFrame(params = {}) {
   }
 
   const node = selection[0];
-  console.log('🔍 Selected node:', {
-    id: node.id,
-    type: node.type,
+  console.log('🔍 Selected node dimensions:', {
     name: node.name,
-    width: node.width,
-    height: node.height
+    totalWidth: Math.round(node.width),
+    totalHeight: Math.round(node.height),
+    type: node.type
   });
 
+  // Initialize content bounds
+  let contentBounds = {
+    minX: Infinity,
+    minY: Infinity,
+    maxX: -Infinity,
+    maxY: -Infinity
+  };
+
+  let visibleElements = 0;
+  let totalElements = 0;
+  let hasFoundContent = false;
+
+  // Helper function to get node's transform or default transform
+  function getNodeTransform(node) {
+    // Default identity transform
+    const defaultTransform = [[1, 0, 0], [0, 1, 0]];
+    
+    try {
+      if (!node.transform) {
+        return defaultTransform;
+      }
+      
+      // Ensure transform has the correct structure
+      if (!Array.isArray(node.transform) || 
+          node.transform.length !== 2 || 
+          !Array.isArray(node.transform[0]) || 
+          !Array.isArray(node.transform[1])) {
+        return defaultTransform;
+      }
+      
+      return node.transform;
+    } catch (error) {
+      console.warn('Error getting transform for node:', node.name, error);
+      return defaultTransform;
+    }
+  }
+
+  // Helper function to combine transforms
+  function combineTransforms(parentTransform, childTransform) {
+    try {
+      return [
+        [
+          childTransform[0][0] * parentTransform[0][0],
+          childTransform[0][1] * parentTransform[0][1],
+          childTransform[0][2] + parentTransform[0][2]
+        ],
+        [
+          childTransform[1][0] * parentTransform[1][0],
+          childTransform[1][1] * parentTransform[1][1],
+          childTransform[1][2] + parentTransform[1][2]
+        ]
+      ];
+    } catch (error) {
+      console.warn('Error combining transforms:', error);
+      return parentTransform;
+    }
+  }
+
+  // Recursive function to find true content bounds
+  function analyzeBounds(node, parentTransform = [[1, 0, 0], [0, 1, 0]]) {
+    if (!node || !node.visible) return;
+
+    totalElements++;
+    
+    // Get node's transform safely
+    const nodeTransform = getNodeTransform(node);
+    // Combine with parent transform
+    const absoluteTransform = combineTransforms(parentTransform, nodeTransform);
+
+    // Check if node has actual visible content
+    const hasVisibleFills = 'fills' in node && 
+      node.fills && 
+      node.fills.length > 0 && 
+      node.fills.some(fill => fill.visible && fill.opacity > 0);
+
+    const hasVisibleStrokes = 'strokes' in node && 
+      node.strokes && 
+      node.strokes.length > 0 && 
+      node.strokes.some(stroke => stroke.visible && stroke.opacity > 0);
+
+    const hasVisibleEffects = 'effects' in node && 
+      node.effects && 
+      node.effects.length > 0 && 
+      node.effects.some(effect => effect.visible);
+
+    // If node has any visible content
+    if (hasVisibleFills || hasVisibleStrokes || hasVisibleEffects) {
+      visibleElements++;
+      hasFoundContent = true;
+
+      try {
+        const absoluteX = absoluteTransform[0][2];
+        const absoluteY = absoluteTransform[1][2];
+        
+        // Include stroke weights in bounds calculation if present
+        const strokeWeight = ('strokeWeight' in node && node.strokeWeight) ? node.strokeWeight : 0;
+        
+        contentBounds.minX = Math.min(contentBounds.minX, absoluteX - strokeWeight/2);
+        contentBounds.minY = Math.min(contentBounds.minY, absoluteY - strokeWeight/2);
+        contentBounds.maxX = Math.max(contentBounds.maxX, absoluteX + node.width + strokeWeight/2);
+        contentBounds.maxY = Math.max(contentBounds.maxY, absoluteY + node.height + strokeWeight/2);
+        
+        console.log(`📍 Visible element found:`, {
+          name: node.name,
+          type: node.type,
+          position: {
+            x: Math.round(absoluteX),
+            y: Math.round(absoluteY)
+          },
+          size: {
+            width: Math.round(node.width),
+            height: Math.round(node.height)
+          }
+        });
+      } catch (error) {
+        console.warn('Error processing node bounds:', node.name, error);
+      }
+    }
+
+    // Recursively analyze children
+    if ('children' in node && node.children) {
+      node.children.forEach(child => {
+        try {
+          analyzeBounds(child, absoluteTransform);
+        } catch (error) {
+          console.warn('Error analyzing child node:', child.name, error);
+        }
+      });
+    }
+  }
+
+  try {
+    analyzeBounds(node);
+
+    // If no visible content was found, use node's position for default size
+    if (!hasFoundContent) {
+      try {
+        const nodeTransform = getNodeTransform(node);
+        contentBounds = {
+          minX: nodeTransform[0][2],
+          minY: nodeTransform[1][2],
+          maxX: nodeTransform[0][2] + 100,
+          maxY: nodeTransform[1][2] + 100
+        };
+      } catch (error) {
+        console.warn('Error setting default bounds:', error);
+        contentBounds = {
+          minX: 0,
+          minY: 0,
+          maxX: 100,
+          maxY: 100
+        };
+      }
+    }
+
+    // Calculate content dimensions
+    const contentWidth = contentBounds.maxX - contentBounds.minX;
+    const contentHeight = contentBounds.maxY - contentBounds.minY;
+
+    // Calculate wasted space
+    const wastedWidth = node.width - contentWidth;
+    const wastedHeight = node.height - contentHeight;
+    const wastedPercentageWidth = Math.round((wastedWidth / node.width) * 100);
+    const wastedPercentageHeight = Math.round((wastedHeight / node.height) * 100);
+
+    // Log detailed analysis
+    console.log('📊 Content Analysis Results:', {
+      totalElements,
+      visibleElements,
+      hasFoundContent,
+      groupDimensions: {
+        width: Math.round(node.width),
+        height: Math.round(node.height),
+        area: Math.round(node.width * node.height)
+      },
+      viewableContentDimensions: {
+        width: Math.round(contentWidth),
+        height: Math.round(contentHeight),
+        area: Math.round(contentWidth * contentHeight)
+      },
+      wastedSpace: {
+        width: Math.round(wastedWidth),
+        height: Math.round(wastedHeight),
+        percentageWidth: wastedPercentageWidth,
+        percentageHeight: wastedPercentageHeight
+      },
+      contentBounds: {
+        top: Math.round(contentBounds.minY),
+        right: Math.round(contentBounds.maxX),
+        bottom: Math.round(contentBounds.maxY),
+        left: Math.round(contentBounds.minX)
+      }
+    });
+
+    // Notify UI of analysis results
+    figma.ui.postMessage({
+      type: 'frame-down-analysis',
+      data: {
+        groupSize: {
+          width: Math.round(node.width),
+          height: Math.round(node.height)
+        },
+        viewableContent: {
+          width: Math.round(contentWidth),
+          height: Math.round(contentHeight)
+        },
+        wastedSpace: {
+          percentageWidth: wastedPercentageWidth,
+          percentageHeight: wastedPercentageHeight
+        }
+      }
+    });
+
+    // Add padding buffer (10% of content size)
+    const paddingBuffer = Math.max(contentWidth, contentHeight) * 0.1;
+
   // Create new frame
-  console.log('📦 Creating new frame...');
+    console.log('📦 Creating new frame with content-aware dimensions...');
   const frame = figma.createFrame();
-  frame.name = 'Basic Frame';
+  frame.name = node.name; // Set frame name to match the selected node's name
   
-  // Make it square based on the larger dimension
-  const maxSize = Math.max(node.width, node.height);
-  console.log(`📏 Setting frame size to ${maxSize}x${maxSize}`);
-  frame.resize(maxSize, maxSize);
-  
-  // Set up auto-layout for bottom-right alignment
+    // Make it square based on the larger content dimension plus padding
+    const maxContentSize = Math.max(contentWidth, contentHeight) + (paddingBuffer * 2);
+    console.log(`📏 Setting frame size to ${maxContentSize}x${maxContentSize}`);
+    frame.resize(maxContentSize, maxContentSize);
+    
+    // Set up frame properties
   frame.layoutMode = 'VERTICAL';
   frame.primaryAxisAlignItems = 'MAX'; // Align to bottom
   frame.counterAxisAlignItems = 'MAX'; // Align to right
   frame.layoutSizingHorizontal = 'FIXED';
   frame.layoutSizingVertical = 'FIXED';
+    frame.clipsContent = false; // Prevent content clipping
+    frame.constrainProportions = true; // Maintain aspect ratio when scaling
   
   // Position frame at the center of the viewport
   const viewport = figma.viewport;
-  frame.x = viewport.center.x - (maxSize / 2);
-  frame.y = viewport.center.y - (maxSize / 2);
+    frame.x = viewport.center.x - (maxContentSize / 2);
+    frame.y = viewport.center.y - (maxContentSize / 2);
   
   // Move the selected node into the frame
   console.log('➡️ Moving node into frame...');
   frame.appendChild(node);
 
+    // Set up node constraints and properties
+    if ('constraints' in node) {
+      node.constraints = {
+        horizontal: 'SCALE',
+        vertical: 'SCALE'
+      };
+    }
+    if ('constrainProportions' in node) {
+      node.constrainProportions = true;
+    }
+
+    // Add a subtle border to make frame bounds visible
+    frame.strokeWeight = 1;
+    frame.strokes = [{
+      type: 'SOLID',
+      color: { r: 0.8, g: 0.8, b: 0.8 }
+    }];
+
   // Select the new frame and ensure it's visible in the viewport
   figma.currentPage.selection = [frame];
   figma.viewport.scrollAndZoomIntoView([frame]);
 
-  console.log('✅ Basic frame conversion complete');
+    console.log('✅ Enhanced basic frame conversion complete');
   return {
     success: true,
     frame: {
       id: frame.id,
       name: frame.name,
       width: frame.width,
-      height: frame.height
-    }
-  };
+        height: frame.height,
+        contentWidth,
+        contentHeight,
+        wastedSpace: {
+          width: wastedWidth,
+          height: wastedHeight,
+          percentageWidth: wastedPercentageWidth,
+          percentageHeight: wastedPercentageHeight
+        }
+      }
+    };
+  } catch (error) {
+    console.error('❌ Error in frame conversion:', error);
+    throw new Error(`Frame conversion failed: ${error.message}`);
+  }
 }
 
 async function frameUp() {
@@ -3884,11 +4131,10 @@ async function frameUp() {
   // Store the original parent for insertion order
   const originalParent = selection[0].parent;
   const nextSibling = selection[0].nextSibling;
-  const parentName = selection[0].parent.name;
-
+  
   // Create a frame that will contain all selected items
   const frame = figma.createFrame();
-  frame.name = parentName;
+  frame.name = "New Frame"; // We'll update this after appending the first item
   
   // Calculate the bounding box of all selected items
   let minX = Infinity;
@@ -3919,6 +4165,7 @@ async function frameUp() {
   frame.paddingBottom = 0;
   
   // Move all selected items into the frame and lock their aspect ratios
+  let isFirstItem = true;
   selection.forEach(node => {
     if (node.type !== 'FRAME') {
       // Adjust position relative to the new frame
@@ -3933,6 +4180,12 @@ async function frameUp() {
     
     // Move the node into the frame
     frame.appendChild(node);
+    
+    // Update frame name to match the first appended item's name
+    if (isFirstItem) {
+      frame.name = node.name;
+      isFirstItem = false;
+    }
   });
 
   // Insert the frame in the original position in the layer stack
