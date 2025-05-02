@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <title>Cursor MCP Plugin</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
     <script>
       // Debug logging function
       function debugLog(step, details) {
@@ -337,6 +338,158 @@
       }
       /* ... existing styles ... */
     </style>
+    <style>
+      .download-status {
+        margin: 10px 0;
+        padding: 10px;
+        border-radius: 4px;
+        background: #2d2d2d;
+      }
+
+      .download-status.ready {
+        background: rgba(76, 175, 80, 0.1);
+        border: 1px solid #4CAF50;
+      }
+
+      .download-status.error {
+        background: rgba(244, 67, 54, 0.1);
+        border: 1px solid #F44336;
+      }
+
+      .download-actions {
+        margin-top: 10px;
+        display: flex;
+        gap: 8px;
+      }
+
+      .file-list {
+        margin: 8px 0;
+        padding-left: 20px;
+        list-style-type: none;
+      }
+
+      .file-list li {
+        margin: 4px 0;
+        color: #999;
+      }
+
+      .file-list li:before {
+        content: "📄";
+        margin-right: 8px;
+      }
+    </style>
+    <style>
+      /* Atlas Section Styles */
+      .progress-container {
+        margin: 12px 0;
+      }
+      
+      .progress-bar {
+        width: 100%;
+        height: 4px;
+        background-color: #333;
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      
+      .progress-fill {
+        height: 100%;
+        background-color: #18a0fb;
+        width: 0%;
+        transition: width 0.3s ease;
+      }
+      
+      .progress-text {
+        font-size: 12px;
+        color: #999;
+        margin-top: 4px;
+        text-align: center;
+      }
+      
+      .download-section {
+        margin-top: 16px;
+        padding: 12px;
+        background-color: #2d2d2d;
+        border-radius: 6px;
+      }
+      
+      .download-section h3 {
+        font-size: 14px;
+        margin: 0 0 12px 0;
+        color: #fff;
+      }
+      
+      .file-list {
+        margin-bottom: 12px;
+      }
+      
+      .file-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px;
+        background-color: #333;
+        border-radius: 4px;
+        margin-bottom: 4px;
+      }
+      
+      .file-name {
+        color: #e0e0e0;
+      }
+      
+      .file-size {
+        color: #999;
+        font-size: 12px;
+      }
+      
+      .download-buttons {
+        display: flex;
+        gap: 8px;
+      }
+      
+      .download-buttons button {
+        flex: 1;
+      }
+      /* End Atlas Section Styles */
+
+      .download-status {
+        margin: 10px 0;
+        padding: 10px;
+        border-radius: 4px;
+        background: #2d2d2d;
+      }
+
+      .download-status.ready {
+        background: rgba(76, 175, 80, 0.1);
+        border: 1px solid #4CAF50;
+      }
+
+      .download-status.error {
+        background: rgba(244, 67, 54, 0.1);
+        border: 1px solid #F44336;
+      }
+
+      .download-actions {
+        margin-top: 10px;
+        display: flex;
+        gap: 8px;
+      }
+
+      .file-list {
+        margin: 8px 0;
+        padding-left: 20px;
+        list-style-type: none;
+      }
+
+      .file-list li {
+        margin: 4px 0;
+        color: #999;
+      }
+
+      .file-list li:before {
+        content: "📄";
+        margin-right: 8px;
+      }
+    </style>
     <script>
       // Debug logging function
       function debugLog(step, details) {
@@ -614,6 +767,10 @@
           <label>Place oversized selection into a frame for resizing</label>
           <button id="convertToFrame" class="button">Frame Down</button>
 
+          <h2>Frame All</h2>
+          <label>Place multiple elements into a frame</label>
+          <button id="convertAllToFrame" class="button">Frame All</button>
+
           <h2>Sprite Frame</h2>
           <label>Place selection in a frame divisible by 2</label>
           <button id="convertToSpriteFrame" class="button">Convert to Sprite Frame</button>
@@ -621,6 +778,38 @@
           <h2>Create Atlas</h2>
           <label>Create Atlas/View JSON selecting multiple frames</label>
           <button id="createAtlas" class="button">Create Atlas</button>
+          
+          <!-- Atlas Status and Download Section -->
+          <div id="atlas-section" class="section">
+            <div id="atlas-status" class="status info">
+              No atlas created yet
+            </div>
+            
+            <div id="atlas-progress" class="progress-container">
+              <div class="progress-bar">
+                <div class="progress-fill"></div>
+              </div>
+              <div class="progress-text">Processing...</div>
+            </div>
+            
+            <div id="atlas-download" class="download-section">
+              <h3>Atlas Files</h3>
+              <div class="file-list">
+                <div class="file-item">
+                  <span class="file-name">atlas.png</span>
+                  <span class="file-size"></span>
+                </div>
+                <div class="file-item">
+                  <span class="file-name">atlas.json</span>
+                  <span class="file-size"></span>
+                </div>
+              </div>
+              <div class="download-buttons">
+                <button id="downloadAtlas" class="button">Download Atlas (ZIP)</button>
+                <button id="clearAtlas" class="button secondary">Clear Atlas</button>
+              </div>
+            </div>
+          </div>
           
           <h2>Export Tile Map</h2>
           <label>View Tile Map JSON with map and item coordinates</label>
@@ -646,6 +835,8 @@
             <h2>Console Logs & JSON Exports</h2>
           <label>View JSON from exports and troubleshoot here</label>
                     <button id="clearLogs" class="button">Clear Logs</button>
+                    <!-- <button id="downloadJSON" class="button">Download JSON</button> -->
+
 
           <div id="tools-log" class="log-container"></div>
 
@@ -1596,14 +1787,30 @@
         timestamp.textContent = new Date().toLocaleTimeString();
         entry.appendChild(timestamp);
 
-        // Handle objects and arrays
+        // Handle objects and arrays - improved JSON handling
         if (typeof message === 'string' && (message.startsWith('{') || message.startsWith('['))) {
           try {
             const parsed = JSON.parse(message);
             const content = document.createElement('pre');
             content.className = 'structured-data';
             content.textContent = JSON.stringify(parsed, null, 2);
+            
+            // Add a download button for JSON data
+            const downloadButton = document.createElement('button');
+            downloadButton.className = 'download-button secondary';
+            downloadButton.style.marginTop = '8px';
+            downloadButton.style.marginBottom = '8px';
+            downloadButton.textContent = 'Download JSON';
+            downloadButton.onclick = () => downloadJSON(parsed);
+            
             entry.appendChild(content);
+            entry.appendChild(downloadButton);
+
+            // Auto scroll to the download button and focus it
+            setTimeout(() => {
+              downloadButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              downloadButton.focus();
+            }, 100);
           } catch (e) {
             entry.appendChild(document.createTextNode(message));
           }
@@ -1618,8 +1825,8 @@
           logContainer.removeChild(logContainer.firstChild);
         }
         
-        // Only scroll into view if explicitly requested
-        if (shouldAutoScroll) {
+        // Only scroll into view if explicitly requested and no download button is present
+        if (shouldAutoScroll && !entry.querySelector('.download-button')) {
           entry.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }
       }
@@ -2334,15 +2541,31 @@
         const createAtlasBtn = document.getElementById('createAtlas');
         if (createAtlasBtn) {
           createAtlasBtn.onclick = () => {
-            const gridSize = parseInt(document.getElementById('selectionGridSize').value);
-            addLogEntry('Creating atlas from selected frames...', 'info', 'tools-log', true); // Add auto-scroll
+            console.log('Create Atlas button clicked');
+            const atlasSection = document.getElementById('atlas-section');
+            const atlasStatus = document.getElementById('atlas-status');
+            const atlasProgress = document.getElementById('atlas-progress');
+            
+            // Reset UI state
+            atlasStatus.textContent = 'Creating atlas...';
+            atlasStatus.className = 'status info';
+            
+            // Show progress elements
+            atlasProgress.classList.remove('hidden');
+            
+            // Reset progress bar
+            const progressFill = document.querySelector('.progress-fill');
+            const progressText = document.querySelector('.progress-text');
+            progressFill.style.width = '0%';
+            progressText.textContent = 'Processing frames...';
+            
+            addLogEntry('Creating atlas from selection...', 'info');
+            
             parent.postMessage({ 
               pluginMessage: { 
                 type: 'execute-command',
                 command: 'create_atlas',
-                params: {
-                  gridSize
-                }
+                params: {}
               }
             }, '*');
           };
@@ -2435,6 +2658,21 @@
               pluginMessage: {
                 type: 'execute-command',
                 command: 'frame-up',
+                params: {}
+              }
+            }, '*');
+          };
+        }
+
+        // Add Frame All button handler
+        const convertAllToFrameBtn = document.getElementById('convertAllToFrame');
+        if (convertAllToFrameBtn) {
+          convertAllToFrameBtn.onclick = () => {
+            addLogEntry('Executing Frame All command...', 'info');
+            parent.postMessage({ 
+              pluginMessage: {
+                type: 'execute-command',
+                command: 'frame-all',
                 params: {}
               }
             }, '*');
@@ -2540,6 +2778,7 @@
         
         const downloadBtn = document.createElement('button');
         downloadBtn.textContent = 'Download JSON';
+        downloadBtn.className = 'download-button';
         downloadBtn.onclick = () => downloadJSON(data);
         
         entry.appendChild(timestamp);
@@ -2547,7 +2786,10 @@
         entry.appendChild(downloadBtn);
         
         logContainer.appendChild(entry);
-        logContainer.scrollTop = logContainer.scrollHeight;
+        
+        // Auto scroll to the download button and focus it
+        downloadBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        downloadBtn.focus();
       }
 
       function downloadJSON(data) {
@@ -2615,6 +2857,232 @@
             }
             break;
           // ... existing message handlers ...
+        }
+      };
+
+      // ... existing code ...
+        if (createAtlas) {
+          createAtlas.onclick = () => {
+            console.log('Create Atlas button clicked');
+            const atlasSection = document.getElementById('atlas-section');
+            const atlasStatus = document.getElementById('atlas-status');
+            const atlasProgress = document.getElementById('atlas-progress');
+            
+            console.log('Updating UI elements');
+            atlasStatus.textContent = 'Creating atlas...';
+            
+            // Update progress bar
+            const progressFill = document.querySelector('.progress-fill');
+            const progressText = document.querySelector('.progress-text');
+            progressFill.style.width = '0%';
+            progressText.textContent = 'Processing frames...';
+            
+            addLogEntry('Creating atlas from selection...', 'info');
+            console.log('Sending create_atlas command to plugin');
+            
+            parent.postMessage({ 
+              pluginMessage: { 
+                type: 'execute-command',
+                command: 'create_atlas',
+                params: {}
+              }
+            }, '*');
+          };
+        }
+
+        // Atlas download button handler
+        const downloadAtlasBtn = document.getElementById('downloadAtlas');
+        if (downloadAtlasBtn) {
+          downloadAtlasBtn.onclick = async () => {
+            console.log('Download Atlas button clicked');
+            try {
+              console.log('Creating new JSZip instance');
+              const zip = new JSZip();
+              
+              // Add the stored atlas files to the zip
+              if (window.atlasData) {
+                console.log('Atlas data found:', window.atlasData);
+                
+                // Add JSON file
+                console.log('Adding JSON file to zip');
+                zip.file('atlas.json', JSON.stringify(window.atlasData.json, null, 2));
+                
+                // Add PNG file
+                console.log('Adding PNG file to zip');
+                const pngData = new Uint8Array(window.atlasData.png);
+                zip.file('atlas.png', pngData);
+                
+                // Generate the zip file
+                console.log('Generating zip file');
+                const content = await zip.generateAsync({type: 'blob'});
+                console.log('Zip file generated successfully');
+                
+                // Create download link
+                console.log('Creating download link');
+                const url = URL.createObjectURL(content);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'atlas.zip';
+                document.body.appendChild(a);
+                console.log('Triggering download');
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                addLogEntry('Atlas files downloaded successfully!', 'success');
+                console.log('Download process completed successfully');
+              } else {
+                console.error('No atlas data available in window.atlasData');
+                addLogEntry('No atlas data available to download', 'error');
+              }
+            } catch (error) {
+              console.error('Error creating zip file:', error);
+              addLogEntry('Error creating zip file: ' + error.message, 'error');
+            }
+          };
+        }
+
+        // Clear atlas button handler
+        const clearAtlasBtn = document.getElementById('clearAtlas');
+        if (clearAtlasBtn) {
+          clearAtlasBtn.onclick = () => {
+            // Clear stored atlas data
+            window.atlasData = null;
+            
+            // Hide the download section
+            const atlasSection = document.getElementById('atlas-section');
+            const atlasDownload = document.getElementById('atlas-download');
+            const atlasProgress = document.getElementById('atlas-progress');
+            const atlasStatus = document.getElementById('atlas-status');
+            
+            atlasDownload.classList.add('hidden');
+            atlasProgress.classList.add('hidden');
+            atlasStatus.textContent = 'No atlas created yet';
+            atlasStatus.className = 'status info';
+            
+            addLogEntry('Atlas data cleared', 'info');
+          };
+        }
+
+        // Handle atlas creation response
+        window.onmessage = async (event) => {
+          const msg = event.data.pluginMessage;
+          if (!msg) return;
+
+          switch (msg.type) {
+            case 'export-atlas-complete':
+            case 'command-result':
+              console.log('Processing atlas data:', msg);
+              try {
+                let atlasData;
+                
+                // Handle both message types
+                if (msg.type === 'export-atlas-complete') {
+                  atlasData = msg.data;
+                } else if (msg.type === 'command-result' && msg.result.success && msg.result.atlas) {
+                  atlasData = msg.result.atlas;
+                }
+
+                if (atlasData) {
+                  // Store the atlas data
+                  window.atlasData = atlasData;
+                  
+                  // Update UI elements
+                  const atlasStatus = document.getElementById('atlas-status');
+                  const progressFill = document.querySelector('.progress-fill');
+                  const progressText = document.querySelector('.progress-text');
+                  const atlasDownload = document.getElementById('atlas-download');
+                  
+                  // Update progress
+                  progressFill.style.width = '100%';
+                  progressText.textContent = 'Atlas created successfully!';
+                  
+                  // Update status
+                  atlasStatus.textContent = 'Atlas created successfully!';
+                  atlasStatus.className = 'status connected';
+                  
+                  // Show download section
+                  atlasDownload.classList.remove('hidden');
+                  
+                  // Add to logs
+                  addLogEntry('Atlas created successfully!', 'success');
+                  addStructuredLogEntry(atlasData, 'success');
+                  
+                  // Create immediate download link for JSON
+                  const jsonBlob = new Blob([JSON.stringify(atlasData, null, 2)], { type: 'application/json' });
+                  const jsonUrl = URL.createObjectURL(jsonBlob);
+                  const downloadLink = document.createElement('a');
+                  downloadLink.href = jsonUrl;
+                  downloadLink.download = `atlas_${Date.now()}.json`;
+                  downloadLink.textContent = 'Download Atlas JSON';
+                  downloadLink.className = 'button';
+                  downloadLink.style.marginTop = '10px';
+                  
+                  // Add download link to the log entry
+                  const logContainer = document.getElementById('tools-log');
+                  logContainer.appendChild(downloadLink);
+                  
+                  // Clean up URL after a delay
+                  setTimeout(() => URL.revokeObjectURL(jsonUrl), 1000);
+                }
+              } catch (error) {
+                console.error('Error processing atlas data:', error);
+                addLogEntry('Error processing atlas data: ' + error.message, 'error');
+                
+                // Update UI to show error
+                const atlasStatus = document.getElementById('atlas-status');
+                const progressText = document.querySelector('.progress-text');
+                
+                atlasStatus.textContent = 'Error creating atlas: ' + error.message;
+                atlasStatus.className = 'status error';
+                progressText.textContent = 'Error occurred';
+              }
+              break;
+          }
+        };
+
+        // Helper function to format file sizes
+        function formatFileSize(bytes) {
+          if (bytes === 0) return '0 B';
+          const k = 1024;
+          const sizes = ['B', 'KB', 'MB', 'GB'];
+          const i = Math.floor(Math.log(bytes) / Math.log(k));
+          return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+      // Function to handle JSON downloads
+      function downloadJSON(data, filename) {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename || `export-${new Date().toISOString().slice(0,19).replace(/[:-]/g, '')}.json`;
+        // Add the link to the document but keep it hidden
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        // Clean up
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 100);
+      }
+
+      // Add global download JSON button handler
+      document.getElementById('downloadJSON').onclick = () => {
+        const logContainer = document.getElementById('tools-log');
+        const entries = logContainer.querySelectorAll('.structured-data');
+        if (entries.length > 0) {
+          // Get the last JSON entry
+          const lastEntry = entries[entries.length - 1];
+          try {
+            const data = JSON.parse(lastEntry.textContent);
+            downloadJSON(data);
+          } catch (e) {
+            console.error('Failed to parse JSON for download:', e);
+          }
+        } else {
+          console.log('No JSON data available to download');
         }
       };
     </script>

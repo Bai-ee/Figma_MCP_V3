@@ -400,6 +400,8 @@ async function handleCommand(command, params) {
       return await convertToBasicFrame(params);
     case "frame-up":
       return await frameUp();
+    case "frame-all":
+      return await frameAll();
     case "export-tile-map":
       return await exportTileMap(params);
     default:
@@ -3628,115 +3630,211 @@ async function handleExportSelection(msg) {
 }
 
 async function createAtlas(params = {}) {
-  console.log('🗺️ Creating atlas from selection...', params);
+  console.log('🗺️ Creating atlas from selection...', { params });
   
   // Get current selection
   const selection = figma.currentPage.selection;
-  console.log(`📝 Current selection: ${selection.length} items`);
+  console.log(`📝 Selection count: ${selection.length} items`);
   
   if (selection.length < 2) {
+    console.error('❌ Error: Not enough frames selected');
     throw new Error('Please select at least 2 frames to create an atlas');
   }
 
   // Validate that all selected items are frames
   const invalidItems = selection.filter(node => node.type !== 'FRAME');
   if (invalidItems.length > 0) {
+    console.error('❌ Error: Invalid items in selection:', invalidItems.map(node => ({
+      name: node.name,
+      type: node.type
+    })));
     throw new Error('All selected items must be frames');
   }
 
-  // Store gridSize param but don't use it for layout
-  const gridSize = params.gridSize || 8;
-  
-  // Create frame objects with original dimensions (no snapping)
-  const frames = selection.map(frame => ({
-    node: frame,
-    width: frame.width,
-    height: frame.height,
+  // Sort frames by area in descending order
+  const frames = selection.map(node => ({
+    node,
+    area: node.width * node.height,
+    width: node.width,
+    height: node.height,
     x: 0,
-    y: 0,
-    originalX: frame.x,
-    originalY: frame.y
-  }));
+    y: 0
+  })).sort((a, b) => b.area - a.area);
 
-  // Find the largest frame by area
-  const largestFrame = frames.reduce((largest, current) => {
-    const currentArea = current.width * current.height;
-    const largestArea = largest.width * largest.height;
-    return currentArea > largestArea ? current : largest;
-  }, frames[0]);
-
+  const largestFrame = frames[0];
   console.log('📏 Largest frame:', {
     name: largestFrame.node.name,
     width: largestFrame.width,
     height: largestFrame.height,
-    position: { x: largestFrame.originalX, y: largestFrame.originalY }
+    area: largestFrame.area
   });
 
-  // Simple shelf-based bin packing algorithm
-  let currentX = 0;
-  let currentY = 0;
-  let shelfHeight = 0;
-  let maxWidth = 0;
-  let maxHeight = 0;
+  // Store gridSize param
+  const gridSize = params.gridSize || 8;
+  console.log('📐 Grid size:', gridSize);
 
-  // Place each frame using shelf algorithm
-  frames.forEach(frame => {
-    // If frame doesn't fit on current shelf, start a new shelf
-    if (currentX + frame.width > maxWidth) {
-      currentX = 0;
-      currentY += shelfHeight;
-      shelfHeight = 0;
-    }
+  // Place largest frame at origin
+  largestFrame.x = 0;
+  largestFrame.y = 0;
+  
+  console.log('📦 Starting optimized packing algorithm...');
+  console.log('Placing largest frame at origin');
 
-    // Place frame at current position
-    frame.x = currentX;
-    frame.y = currentY;
-    console.log("Placing " + frame.node.name + " at (" + frame.x + "," + frame.y + ")");
+  // Initialize space tracking
+  let currentWidth = largestFrame.width;
+  let currentHeight = largestFrame.height;
+  const placedFrames = [largestFrame];
 
-    // Update shelf height if this frame is taller
-    shelfHeight = Math.max(shelfHeight, frame.height);
-    
-    // Update atlas bounds
-    maxWidth = Math.max(maxWidth, currentX + frame.width);
-    maxHeight = Math.max(maxHeight, currentY + frame.height);
-
-    // Move x position for next frame
-    currentX += frame.width;
-  });
-
-  // Check if atlas exceeds maximum dimensions
-  const MAX_ATLAS_SIZE = 2048;
-  if (maxWidth > MAX_ATLAS_SIZE || maxHeight > MAX_ATLAS_SIZE) {
-    console.error(`❌ Error: Atlas size (${maxWidth}x${maxHeight}) exceeds maximum dimensions of ${MAX_ATLAS_SIZE}x${MAX_ATLAS_SIZE}`);
-    throw new Error(`Atlas size (${maxWidth}x${maxHeight}) exceeds maximum dimensions of ${MAX_ATLAS_SIZE}x${MAX_ATLAS_SIZE}`);
+  // Helper function to check if a position is valid for a frame
+  function canPlaceFrame(frame, x, y, placedFrames) {
+    return !placedFrames.some(placed => {
+      return !(x + frame.width <= placed.x ||
+               x >= placed.x + placed.width ||
+               y + frame.height <= placed.y ||
+               y >= placed.y + placed.height);
+    });
   }
 
-  // Create new atlas frame with exact dimensions
-  console.log('📦 Creating atlas frame with dimensions:', { width: maxWidth, height: maxHeight });
+  // Helper function to find best position for a frame
+  function findBestPosition(frame, placedFrames) {
+    let bestX = null;
+    let bestY = null;
+    let minArea = Infinity;
+    
+    // Try positions along the right edge of existing frames
+    for (const placed of placedFrames) {
+      const x = placed.x + placed.width;
+      const y = placed.y;
+      
+      if (canPlaceFrame(frame, x, y, placedFrames)) {
+        const newWidth = Math.max(currentWidth, x + frame.width);
+        const newHeight = Math.max(currentHeight, y + frame.height);
+        const area = newWidth * newHeight;
+        
+        if (area < minArea) {
+          minArea = area;
+          bestX = x;
+          bestY = y;
+        }
+      }
+    }
+    
+    // Try positions along the bottom edge of existing frames
+    for (const placed of placedFrames) {
+      const x = placed.x;
+      const y = placed.y + placed.height;
+      
+      if (canPlaceFrame(frame, x, y, placedFrames)) {
+        const newWidth = Math.max(currentWidth, x + frame.width);
+        const newHeight = Math.max(currentHeight, y + frame.height);
+        const area = newWidth * newHeight;
+        
+        if (area < minArea) {
+          minArea = area;
+          bestX = x;
+          bestY = y;
+        }
+      }
+    }
+    
+    return { x: bestX, y: bestY };
+  }
+
+  // Place remaining frames
+  for (let i = 1; i < frames.length; i++) {
+    const frame = frames[i];
+    const position = findBestPosition(frame, placedFrames);
+    
+    if (position.x === null || position.y === null) {
+      // If no position found along edges, try grid positions
+      let placed = false;
+      for (let y = 0; y <= currentHeight && !placed; y += gridSize) {
+        for (let x = 0; x <= currentWidth && !placed; x += gridSize) {
+          if (canPlaceFrame(frame, x, y, placedFrames)) {
+            frame.x = x;
+            frame.y = y;
+            placed = true;
+            break;
+          }
+        }
+      }
+      
+      if (!placed) {
+        // Try positions beyond current bounds
+        for (let y = 0; y <= currentHeight + frame.height && !placed; y += gridSize) {
+          for (let x = 0; x <= currentWidth + frame.width && !placed; x += gridSize) {
+            if (canPlaceFrame(frame, x, y, placedFrames)) {
+              frame.x = x;
+              frame.y = y;
+              placed = true;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (!placed) {
+        throw new Error(`Could not find a suitable position for frame: ${frame.node.name}`);
+      }
+    } else {
+      frame.x = position.x;
+      frame.y = position.y;
+    }
+    
+    placedFrames.push(frame);
+    currentWidth = Math.max(currentWidth, frame.x + frame.width);
+    currentHeight = Math.max(currentHeight, frame.y + frame.height);
+    
+    console.log(`📦 Frame ${i + 1}/${frames.length}: Placing ${frame.node.name}`, {
+      position: { x: frame.x, y: frame.y },
+      dimensions: { width: frame.width, height: frame.height }
+    });
+  }
+
+  // Create new atlas frame with minimum required dimensions
+  console.log('🎨 Creating atlas frame...');
   const atlas = figma.createFrame();
   atlas.name = 'Sprite Atlas';
-  atlas.resize(maxWidth, maxHeight);
+  atlas.resize(currentWidth, currentHeight);
   
   // Disable auto-layout for precise positioning
   atlas.layoutMode = 'NONE';
   
-  // Position atlas at the same position as the largest frame
-  atlas.x = largestFrame.originalX;
-  atlas.y = largestFrame.originalY;
+  // Position atlas at the center of the viewport
+  const viewport = figma.viewport;
+  atlas.x = viewport.center.x - (currentWidth / 2);
+  atlas.y = viewport.center.y - (currentHeight / 2);
+
+  console.log('📍 Atlas frame created:', {
+    name: atlas.name,
+    dimensions: { width: currentWidth, height: currentHeight },
+    position: { x: atlas.x, y: atlas.y }
+  });
 
   // Add all frames to the atlas at their calculated positions
   console.log('➡️ Adding frames to atlas...');
-  frames.forEach(frame => {
+  frames.forEach((frame, index) => {
+    console.log(`📥 Adding frame ${index + 1}/${frames.length}: ${frame.node.name}`);
     atlas.appendChild(frame.node);
+    
+    // Set frame position relative to atlas origin
     frame.node.x = frame.x;
     frame.node.y = frame.y;
+    
+    console.log(`✓ Frame ${frame.node.name} positioned:`, {
+      relative: { x: frame.x, y: frame.y },
+      absolute: { x: frame.node.x, y: frame.node.y }
+    });
   });
 
-  // Select the atlas and ensure it's visible in the viewport
+  // Select the atlas without changing viewport
   figma.currentPage.selection = [atlas];
-  // figma.viewport.scrollAndZoomIntoView([atlas]); // Removed to prevent viewport changes
+  console.log('✓ Atlas selected');
 
+  // No viewport changes - keep user's current view
+  
   // Build frames array for JSON
+  console.log('📝 Generating atlas JSON data...');
   const framesArr = frames.map((frame) => ({
     filename: `${frame.node.name}.png`,
     rotated: false,
@@ -3764,8 +3862,8 @@ async function createAtlas(params = {}) {
     image: "atlas.png",
     format: "RGBA8888",
     size: {
-      w: Math.round(maxWidth),
-      h: Math.round(maxHeight)
+      w: Math.round(currentWidth),
+      h: Math.round(currentHeight)
     },
     scale: 1,
     frames: framesArr
@@ -3783,13 +3881,6 @@ async function createAtlas(params = {}) {
     meta: metaObj
   };
 
-  // Format JSON with 2-space indentation
-  const formattedJson = JSON.stringify(atlasJson, null, 2);
-  
-  // Log the formatted JSON to console
-  console.log('Atlas JSON Data:');
-  console.log(formattedJson);
-
   // Send to UI
   console.log('📤 Sending atlas JSON to UI...');
   figma.ui.postMessage({
@@ -3797,17 +3888,40 @@ async function createAtlas(params = {}) {
     data: atlasJson
   });
 
-  console.log('✅ Atlas created successfully');
+  console.log('✅ Atlas creation completed successfully');
+
+  // After creating and positioning the atlas frame, set up export settings
+  atlas.exportSettings = [{
+    format: 'PNG',
+    constraint: { type: 'SCALE', value: 1 }
+  }];
+
+  // Export the frame as PNG
+  const bytes = await atlas.exportAsync({
+    format: 'PNG',
+    constraint: { type: 'SCALE', value: 1 }
+  });
+
+  // Send both the PNG bytes and JSON to UI for download
+  console.log('📤 Sending atlas data to UI...');
+  figma.ui.postMessage({
+    type: "export-atlas-complete",
+    data: {
+      json: atlasJson,
+      png: Array.from(bytes), // Convert Uint8Array to regular array for messaging
+      name: atlas.name
+    }
+  });
+
   return {
     success: true,
     atlas: {
       id: atlas.id,
       name: atlas.name,
-      width: maxWidth,
-      height: maxHeight,
+      width: currentWidth,
+      height: currentHeight,
       gridSize: gridSize,
-      framesCount: selection.length,
-      json: atlasJson
+      framesCount: selection.length
     }
   };
 }
@@ -4131,7 +4245,7 @@ async function frameUp() {
   // Store the original parent for insertion order
   const originalParent = selection[0].parent;
   const nextSibling = selection[0].nextSibling;
-  
+
   // Create a frame that will contain all selected items
   const frame = figma.createFrame();
   frame.name = "New Frame"; // We'll update this after appending the first item
@@ -4201,6 +4315,72 @@ async function frameUp() {
   return {
     success: true,
     message: 'Created aspect-locked frame successfully'
+  };
+}
+
+async function frameAll() {
+  const selection = figma.currentPage.selection;
+  
+  if (selection.length === 0) {
+    throw new Error('Please select at least one item');
+  }
+
+  const frames = [];
+  
+  // Sort selection based on their order in the layer stack
+  const sortedSelection = [...selection].sort((a, b) => {
+    const aIndex = a.parent.children.indexOf(a);
+    const bIndex = b.parent.children.indexOf(b);
+    return aIndex - bIndex;
+  });
+  
+  // Create individual frames for each selected item
+  for (const node of sortedSelection) {
+    // Create a frame
+    const frame = figma.createFrame();
+    frame.name = node.name;
+    
+    // Set frame position and size to match the node
+    frame.x = node.x;
+    frame.y = node.y;
+    frame.resize(node.width, node.height);
+    
+    // Set frame properties for hugging content
+    frame.layoutMode = "HORIZONTAL";
+    frame.primaryAxisSizingMode = "AUTO";
+    frame.counterAxisSizingMode = "AUTO";
+    frame.itemSpacing = 0;
+    frame.paddingLeft = 0;
+    frame.paddingRight = 0;
+    frame.paddingTop = 0;
+    frame.paddingBottom = 0;
+    
+    // Store original parent and position in layer stack
+    const originalParent = node.parent;
+    const originalIndex = originalParent.children.indexOf(node);
+    
+    // Move the node into the frame
+    if (node.type !== 'FRAME') {
+      // Lock aspect ratio if the node supports it
+      if ('constrainProportions' in node) {
+        node.constrainProportions = true;
+      }
+    }
+    
+    frame.appendChild(node);
+    
+    // Insert the frame at the original node's position in the layer stack
+    originalParent.insertChild(originalIndex, frame);
+    
+    frames.push(frame);
+  }
+  
+  // Select all the new frames in their original order
+  figma.currentPage.selection = frames;
+  
+  return {
+    success: true,
+    message: `Created ${frames.length} frames successfully`
   };
 }
 
