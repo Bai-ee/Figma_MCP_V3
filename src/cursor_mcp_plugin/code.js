@@ -404,6 +404,8 @@ async function handleCommand(command, params) {
       return await frameAll();
     case "export-tile-map":
       return await exportTileMap(params);
+    case "export-atlas-tilemap":
+      return await exportAtlasWithTileMap(params);
     default:
       throw new Error(`Unknown command: ${command}`);
   }
@@ -3125,6 +3127,10 @@ async function convertToFrame(params = {}) {
     height: node.height
   });
 
+  // Store original position before any modifications
+  const originalX = node.absoluteTransform[0][2];
+  const originalY = node.absoluteTransform[1][2];
+
   // Create new auto-layout frame
   console.log('📦 Creating new auto-layout frame...');
   const frame = figma.createFrame();
@@ -3143,14 +3149,17 @@ async function convertToFrame(params = {}) {
   frame.layoutSizingHorizontal = 'FIXED';
   frame.layoutSizingVertical = 'FIXED';
   
-  // Position frame at the center of the viewport
-  const viewport = figma.viewport;
-  frame.x = viewport.center.x - (maxSize / 2);
-  frame.y = viewport.center.y - (maxSize / 2);
+  // Position frame at the original absolute position
+  frame.x = originalX;
+  frame.y = originalY;
   
   // Move the selected node into the frame
   console.log('➡️ Moving node into frame...');
   frame.appendChild(node);
+  
+  // Reset node position within frame to maintain original position
+  node.x = 0;
+  node.y = 0;
 
   // Set up pixel grid with specified or default size
   const gridSize = params.gridSize || 8; // Default to 8 if not specified
@@ -3163,21 +3172,10 @@ async function convertToFrame(params = {}) {
   };
   frame.layoutGrids = [grid];
 
-  // Select the new frame and ensure it's visible in the viewport
+  // Select the new frame without changing viewport
   figma.currentPage.selection = [frame];
   
-  // Zoom to a comfortable level (80% of viewport)
-  const padding = 100; // Add padding around the frame
-  figma.viewport.scrollAndZoomIntoView([frame]);
-  
-  // Additional zoom adjustment for better visibility
-  const targetZoom = Math.min(
-    (viewport.bounds.width * 0.8) / frame.width,
-    (viewport.bounds.height * 0.8) / frame.height
-  );
-  figma.viewport.zoom = targetZoom;
-  
-  console.log('✨ Frame created and centered in viewport');
+  console.log('✨ Frame created at exact original position');
   return {
     success: true,
     frame: {
@@ -3316,201 +3314,128 @@ async function snapToGrid(params) {
   }
 }
 
-async function exportPhaserMap(params) {
-  console.log('🗺️ Exporting Phaser map with params:', params);
-
-  try {
-    const { tileWidth, tileHeight, tilesetName, mapName } = params;
-
-    if (!tileWidth || !tileHeight || !tilesetName || !mapName) {
-      throw new Error('Missing required parameters');
-    }
-
-    // Get current selection
-    const selection = figma.currentPage.selection;
-    if (!selection || selection.length === 0) {
-      throw new Error('No selection found');
-    }
-
-    // Validate selection is a frame
-    const frame = selection[0];
-    if (frame.type !== 'FRAME') {
-      throw new Error('Selected node must be a frame');
-    }
-
-    // Calculate grid dimensions
-    const cols = Math.floor(frame.width / tileWidth);
-    const rows = Math.floor(frame.height / tileHeight);
-
-    console.log(`📐 Grid dimensions: ${cols}x${rows}`);
-
-    // Initialize empty tilemap data
-    const tilemapData = {
-      type: 'map',
-      version: 1,
-      width: cols,
-      height: rows,
-      tilewidth: tileWidth,
-      tileheight: tileHeight,
-      orientation: 'orthogonal',
-      renderorder: 'right-down',
-      infinite: false,
-      nextlayerid: 2,
-      nextobjectid: 1,
-      properties: [],
-      tilesets: [
-        {
-          name: tilesetName,
-          firstgid: 1,
-          tilewidth: tileWidth,
-          tileheight: tileHeight,
-          spacing: 0,
-          margin: 0,
-          image: `${tilesetName}.png`,
-          imagewidth: frame.width,
-          imageheight: frame.height,
-          tilecount: cols * rows,
-          columns: cols
-        }
-      ],
-      layers: [
-        {
-          type: 'tilelayer',
-          name: 'Tile Layer 1',
-          x: 0,
-          y: 0,
-          width: cols,
-          height: rows,
-          opacity: 1,
-          visible: true,
-          data: []
-        }
-      ]
-    };
-
-    // Fill layer data with tile indices (1-based)
-    for (let y = 0; y < rows; y++) {
-      for (let x = 0; x < cols; x++) {
-        const tileIndex = y * cols + x + 1; // 1-based indexing
-        tilemapData.layers[0].data.push(tileIndex);
-      }
-    }
-
-    // Create the terminal-style frame
-    const terminalFrame = figma.createFrame();
-    terminalFrame.name = `${mapName}.json`;
-    
-    // Position in the center of the viewport
-    const { x, y } = figma.viewport.center;
-    
-    // Set frame properties for terminal look
-    terminalFrame.layoutMode = 'VERTICAL';
-    terminalFrame.primaryAxisSizingMode = 'AUTO';
-    terminalFrame.counterAxisSizingMode = 'AUTO';
-    terminalFrame.fills = [{ type: 'SOLID', color: { r: 0.133, g: 0.133, b: 0.133 } }]; // Dark gray background
-    terminalFrame.paddingLeft = 24;
-    terminalFrame.paddingRight = 24;
-    terminalFrame.paddingTop = 24;
-    terminalFrame.paddingBottom = 24;
-    terminalFrame.cornerRadius = 12;
-    
-    // Add terminal header
-    const headerFrame = figma.createFrame();
-    headerFrame.name = 'Terminal Header';
-    headerFrame.layoutMode = 'HORIZONTAL';
-    headerFrame.primaryAxisSizingMode = 'FIXED';  // Changed from FILL to FIXED
-    headerFrame.counterAxisSizingMode = 'AUTO';
-    headerFrame.fills = [{ type: 'SOLID', color: { r: 0.2, g: 0.2, b: 0.2 } }]; // Slightly lighter gray
-    headerFrame.paddingLeft = 12;
-    headerFrame.paddingRight = 12;
-    headerFrame.paddingTop = 8;
-    headerFrame.paddingBottom = 8;
-    headerFrame.cornerRadius = 8;
-    headerFrame.resize(400, headerFrame.height); // Set a fixed width for the header
-    
-    // Create header text and load fonts first
-    const headerText = figma.createText();
-    const textNode = figma.createText();
-
-    // Load all required fonts first
-    console.log('Loading fonts...');
-    await Promise.all([
-      figma.loadFontAsync({ family: "Inter", style: "Medium" }),
-      figma.loadFontAsync({ family: "Inter", style: "Regular" })
-    ]);
-
-    // Try to load additional monospace fonts
-    let monospaceFontLoaded = false;
-    try {
-      await figma.loadFontAsync({ family: "JetBrains Mono", style: "Regular" });
-      textNode.fontName = { family: "JetBrains Mono", style: "Regular" };
-      monospaceFontLoaded = true;
-    } catch (e1) {
-      try {
-        await figma.loadFontAsync({ family: "Consolas", style: "Regular" });
-        textNode.fontName = { family: "Consolas", style: "Regular" };
-        monospaceFontLoaded = true;
-      } catch (e2) {
-        console.log('Falling back to Inter font');
-        textNode.fontName = { family: "Inter", style: "Regular" };
-      }
-    }
-
-    // Now set up the header
-    headerText.fontName = { family: "Inter", style: "Medium" };
-    headerText.characters = `${mapName}.json`;
-    headerText.fills = [{ type: 'SOLID', color: { r: 0.8, g: 0.8, b: 0.8 } }]; // Light gray text
-    
-    // Add header elements
-    headerFrame.appendChild(headerText);
-    terminalFrame.appendChild(headerFrame);
-
-    // Add the main text content
-    terminalFrame.appendChild(textNode);
-    
-    // Format JSON with proper indentation and add command prompt style
-    const formattedJson = JSON.stringify(tilemapData, null, 2);
-    textNode.characters = `$ cat ${mapName}.json\n${formattedJson}`;
-    
-    // Style the text
-    textNode.fontSize = 12;
-    textNode.fills = [{ type: 'SOLID', color: { r: 0.8, g: 0.8, b: 0.8 } }]; // Light gray text
-    textNode.lineHeight = { value: 150, unit: 'PERCENT' }; // Increase line height for better readability
-
-    // Add drop shadow to terminal window
-    terminalFrame.effects = [
-      {
-        type: 'DROP_SHADOW',
-        color: { r: 0, g: 0, b: 0, a: 0.3 },
-        offset: { x: 0, y: 4 },
-        radius: 16,
-        spread: 0,
-        visible: true,
-        blendMode: 'NORMAL'
-      }
-    ];
-
-    // Position the frame in the center of the viewport
-    terminalFrame.x = x - (terminalFrame.width / 2);
-    terminalFrame.y = y - (terminalFrame.height / 2);
-
-    // Select the frame and zoom to it
-    figma.currentPage.selection = [terminalFrame];
-    figma.viewport.scrollAndZoomIntoView([terminalFrame]);
-
-    console.log('✅ Tilemap exported successfully');
-    figma.notify('Tilemap exported successfully');
-
+async function exportTileMap(params) {
+  const commandId = generateCommandId();
+  sendProgressUpdate(commandId, 'EXPORT_TILEMAP', 'STARTED', 0, 100, 0, '🚀 Starting tile map export...');
+  
+  const selection = figma.currentPage.selection;
+  
+  if (selection.length !== 1 || selection[0].type !== 'FRAME') {
+    sendProgressUpdate(commandId, 'EXPORT_TILEMAP', 'ERROR', 100, 100, 100, '❌ Please select a single frame to export');
     return {
-      success: true,
-      mapData: tilemapData
+      success: false,
+      error: 'Please select a single frame to export'
     };
-
-  } catch (error) {
-    console.error('❌ Error exporting tilemap:', error);
-    figma.notify('Error exporting tilemap: ' + error.message, { error: true });
-    throw error;
   }
+
+  const selectedFrame = selection[0];
+  sendProgressUpdate(commandId, 'EXPORT_TILEMAP', 'IN_PROGRESS', 10, 100, 10, '📋 Processing selected frame: ' + selectedFrame.name);
+
+  // Get visible, non-vector children
+  const validChildren = selectedFrame.children.filter(child => {
+    return child.visible && child.type !== 'VECTOR';
+  });
+
+  sendProgressUpdate(commandId, 'EXPORT_TILEMAP', 'IN_PROGRESS', 30, 100, 30, `🔍 Processing ${validChildren.length} valid child elements...`);
+
+  // Process child elements
+  const objects = validChildren.map((child, index) => {
+    const progress = 30 + Math.floor((index / validChildren.length) * 60);
+    sendProgressUpdate(
+      commandId, 
+      'EXPORT_TILEMAP', 
+      'IN_PROGRESS', 
+      progress, 
+      100, 
+      progress, 
+      `Processing object ${index + 1}/${validChildren.length}: ${child.name}`
+    );
+
+    // Get absolute bounds
+    const bounds = child.absoluteBoundingBox;
+    
+    // Calculate position relative to frame origin
+    const relativeX = Math.round(bounds.x - selectedFrame.absoluteBoundingBox.x);
+    const relativeY = Math.round(bounds.y - selectedFrame.absoluteBoundingBox.y);
+
+    // Determine object type based on Figma node type
+    let objectType = 'sprite'; // default
+    switch(child.type) {
+      case 'RECTANGLE':
+      case 'ELLIPSE':
+        objectType = 'sprite';
+        break;
+      case 'TEXT':
+        objectType = 'text';
+        break;
+      case 'FRAME':
+        objectType = 'container';
+        break;
+      case 'COMPONENT':
+      case 'INSTANCE':
+        objectType = 'prefab';
+        break;
+      default:
+        objectType = 'sprite';
+    }
+
+    // Build object data
+    return {
+      id: child.id,
+      name: child.name || `Object_${index + 1}`,
+      type: objectType,
+      x: relativeX,
+      y: relativeY,
+      width: Math.round(bounds.width),
+      height: Math.round(bounds.height),
+      rotation: child.rotation || 0,
+      properties: {
+        figmaType: child.type,
+        visible: child.visible,
+        opacity: typeof child.opacity !== 'undefined' ? child.opacity : 1,
+        blendMode: child.blendMode || 'NORMAL'
+      }
+    };
+  });
+
+  sendProgressUpdate(commandId, 'EXPORT_TILEMAP', 'IN_PROGRESS', 90, 100, 90, '📦 Generating final export data...');
+
+  // Get background color safely
+  let backgroundColor = { r: 1, g: 1, b: 1, a: 1 }; // default white
+  if (selectedFrame.backgrounds && 
+      selectedFrame.backgrounds.length > 0 && 
+      selectedFrame.backgrounds[0].color) {
+    backgroundColor = selectedFrame.backgrounds[0].color;
+  }
+
+  // Create the final export data structure
+  const exportData = {
+    tilemap: {
+      name: selectedFrame.name,
+      width: Math.round(selectedFrame.width),
+      height: Math.round(selectedFrame.height),
+      backgroundColor: backgroundColor,
+      properties: {
+        id: selectedFrame.id,
+        type: selectedFrame.type,
+        visible: selectedFrame.visible,
+        opacity: typeof selectedFrame.opacity !== 'undefined' ? selectedFrame.opacity : 1,
+        blendMode: selectedFrame.blendMode || 'NORMAL'
+      }
+    },
+    objects: objects
+  };
+
+  // Log the complete export data for debugging
+  console.log('Generated Tile Map Export:', JSON.stringify(exportData, null, 2));
+
+  sendProgressUpdate(commandId, 'EXPORT_TILEMAP', 'COMPLETED', 100, 100, 100, '✨ Tile map export completed successfully!');
+
+  // Return the complete result
+  return {
+    success: true,
+    exportData: exportData
+  };
 }
 
 // Add the analyze layers handler function
@@ -4391,11 +4316,13 @@ function logStep(step, details = '') {
 }
 
 async function exportTileMap(params) {
-  logStep('🚀 Starting the export function');
+  const commandId = generateCommandId();
+  sendProgressUpdate(commandId, 'EXPORT_TILEMAP', 'STARTED', 0, 100, 0, '🚀 Starting tile map export...');
+  
   const selection = figma.currentPage.selection;
   
   if (selection.length !== 1 || selection[0].type !== 'FRAME') {
-    console.error('Please select a single frame to export');
+    sendProgressUpdate(commandId, 'EXPORT_TILEMAP', 'ERROR', 100, 100, 100, '❌ Please select a single frame to export');
     return {
       success: false,
       error: 'Please select a single frame to export'
@@ -4403,132 +4330,220 @@ async function exportTileMap(params) {
   }
 
   const selectedFrame = selection[0];
-  logStep('📋 Selected frame', `${selectedFrame.name}`);
+  sendProgressUpdate(commandId, 'EXPORT_TILEMAP', 'IN_PROGRESS', 10, 100, 10, '📋 Processing selected frame: ' + selectedFrame.name);
 
-  const TILE_SIZE = params.gridSize || 32;
-  const WIDTH = Math.ceil(selectedFrame.width / TILE_SIZE);
-  const HEIGHT = Math.ceil(selectedFrame.height / TILE_SIZE);
+  // Get visible, non-vector children
+  const validChildren = selectedFrame.children.filter(child => {
+    return child.visible && child.type !== 'VECTOR';
+  });
 
-  // Create empty ground layer data with proper dimensions
-  const groundLayerData = new Array(WIDTH * HEIGHT).fill(0);
+  sendProgressUpdate(commandId, 'EXPORT_TILEMAP', 'IN_PROGRESS', 30, 100, 30, `🔍 Processing ${validChildren.length} valid child elements...`);
 
-  // Convert children to collision objects with complete properties
-  const objects = selectedFrame.children.map((child, index) => {
+  // Process child elements
+  const objects = validChildren.map((child, index) => {
+    const progress = 30 + Math.floor((index / validChildren.length) * 60);
+    sendProgressUpdate(
+      commandId, 
+      'EXPORT_TILEMAP', 
+      'IN_PROGRESS', 
+      progress, 
+      100, 
+      progress, 
+      `Processing object ${index + 1}/${validChildren.length}: ${child.name}`
+    );
+
+    // Get absolute bounds
     const bounds = child.absoluteBoundingBox;
+    
+    // Calculate position relative to frame origin
+    const relativeX = Math.round(bounds.x - selectedFrame.absoluteBoundingBox.x);
+    const relativeY = Math.round(bounds.y - selectedFrame.absoluteBoundingBox.y);
+
+    // Determine object type based on Figma node type
+    let objectType = 'sprite'; // default
+    switch(child.type) {
+      case 'RECTANGLE':
+      case 'ELLIPSE':
+        objectType = 'sprite';
+        break;
+      case 'TEXT':
+        objectType = 'text';
+        break;
+      case 'FRAME':
+        objectType = 'container';
+        break;
+      case 'COMPONENT':
+      case 'INSTANCE':
+        objectType = 'prefab';
+        break;
+      default:
+        objectType = 'sprite';
+    }
+
+    // Build object data
     return {
-      id: index + 1,
-      name: child.name || `Object ${index + 1}`,
-      type: child.type.toLowerCase(),
-      x: Math.round(bounds.x - selectedFrame.absoluteBoundingBox.x),
-      y: Math.round(bounds.y - selectedFrame.absoluteBoundingBox.y),
+      id: child.id,
+      name: child.name || `Object_${index + 1}`,
+      type: objectType,
+      x: relativeX,
+      y: relativeY,
       width: Math.round(bounds.width),
       height: Math.round(bounds.height),
       rotation: child.rotation || 0,
-      visible: child.visible,
-      properties: {}
+      properties: {
+        figmaType: child.type,
+        visible: child.visible,
+        opacity: typeof child.opacity !== 'undefined' ? child.opacity : 1,
+        blendMode: child.blendMode || 'NORMAL'
+      }
     };
   });
 
-  const mapData = {
-    compressionlevel: -1,
-    height: HEIGHT,
-    width: WIDTH,
-    tilewidth: TILE_SIZE,
-    tileheight: TILE_SIZE,
-    infinite: false,
-    orientation: "orthogonal",
-    renderorder: "right-down",
-    tiledversion: "1.10.1",
-    type: "map",
-    version: "1.10",
-    nextlayerid: 3,
-    nextobjectid: objects.length + 1,
-    layers: [
-      {
-        id: 1,
-        name: "Ground",
-        type: "tilelayer",
-        x: 0,
-        y: 0,
-        width: WIDTH,
-        height: HEIGHT,
-        opacity: 1,
-        visible: true,
-        data: groundLayerData
-      },
-      {
-        id: 2,
-        name: "Collision",
-        type: "objectgroup",
-        draworder: "topdown",
-        x: 0,
-        y: 0,
-        opacity: 1,
-        visible: true,
-        objects: objects
+  sendProgressUpdate(commandId, 'EXPORT_TILEMAP', 'IN_PROGRESS', 90, 100, 90, '📦 Generating final export data...');
+
+  // Get background color safely
+  let backgroundColor = { r: 1, g: 1, b: 1, a: 1 }; // default white
+  if (selectedFrame.backgrounds && 
+      selectedFrame.backgrounds.length > 0 && 
+      selectedFrame.backgrounds[0].color) {
+    backgroundColor = selectedFrame.backgrounds[0].color;
+  }
+
+  // Create the final export data structure
+  const exportData = {
+    tilemap: {
+      name: selectedFrame.name,
+      width: Math.round(selectedFrame.width),
+      height: Math.round(selectedFrame.height),
+      backgroundColor: backgroundColor,
+      properties: {
+        id: selectedFrame.id,
+        type: selectedFrame.type,
+        visible: selectedFrame.visible,
+        opacity: typeof selectedFrame.opacity !== 'undefined' ? selectedFrame.opacity : 1,
+        blendMode: selectedFrame.blendMode || 'NORMAL'
       }
-    ],
-    tilesets: [
-      {
-        firstgid: 1,
-        name: "tilemap",
-        tilewidth: TILE_SIZE,
-        tileheight: TILE_SIZE,
-        spacing: 0,
-        margin: 0,
-        image: "tileset.png",
-        imagewidth: selectedFrame.width,
-        imageheight: selectedFrame.height,
-        columns: WIDTH,
-        tilecount: WIDTH * HEIGHT
-      }
-    ]
+    },
+    objects: objects
   };
 
-  // Log the complete map data for debugging
-  console.log('Generated Tile Map Data:', JSON.stringify(mapData, null, 2));
+  // Log the complete export data for debugging
+  console.log('Generated Tile Map Export:', JSON.stringify(exportData, null, 2));
+
+  sendProgressUpdate(commandId, 'EXPORT_TILEMAP', 'COMPLETED', 100, 100, 100, '✨ Tile map export completed successfully!');
 
   // Return the complete result
   return {
     success: true,
-    mapData: mapData
+    exportData: exportData
   };
 }
 
-// Add selection change listener
-figma.on('selectionchange', () => {
-  logSelectionInfo();
-});
+// Helper function to log selection information
+function logSelectionInfo(selection) {
+  if (!selection || selection.length === 0) {
+    console.log('⚠️ No selection');
+    return;
+  }
 
-// Function to log selection information
-function logSelectionInfo() {
-  const selection = figma.currentPage.selection;
-
-  console.log('🎯 Selection changed:', {
+  console.log('📋 Selection Info:', {
     count: selection.length,
-    types: selection.map(node => node.type)
+    types: selection.map(node => node.type),
+    names: selection.map(node => node.name),
+    ids: selection.map(node => node.id)
   });
 
-  // Check if a frame is selected
-  if (selection.length === 1 && selection[0].type === "FRAME") {
-    const frame = selection[0];
-    console.log('📦 Selected frame:', {
-      name: frame.name,
-      id: frame.id,
-      size: `${frame.width}x${frame.height}`
+  selection.forEach((node, index) => {
+    console.log(`🔍 Node ${index + 1}:`, {
+      id: node.id,
+      name: node.name,
+      type: node.type,
+      width: node.width,
+      height: node.height,
+      x: node.x,
+      y: node.y
+    });
+  });
+}
+
+// Combined Export Function
+async function exportAtlasWithTileMap(params) {
+  console.log('🚀 Starting combined atlas and tile map export...');
+  
+  try {
+    // Log current selection
+    const selection = figma.currentPage.selection;
+    logSelectionInfo(selection);
+
+    if (!selection || selection.length !== 1) {
+      throw new Error("Please select a single tilemap frame to export.");
+    }
+
+    const tileMapFrame = selection[0];
+    if (tileMapFrame.type !== 'FRAME') {
+      throw new Error("Selected element must be a frame.");
+    }
+
+    // Get all valid child frames
+    const validChildren = tileMapFrame.children.filter(child => {
+      return child.visible && (child.type === 'FRAME' || child.type === 'COMPONENT' || child.type === 'INSTANCE');
     });
 
-    // Log children information
-    console.log('🔍 Frame contents:');
-    frame.children.forEach(node => {
-      if ("absoluteBoundingBox" in node) {
-        const { x, y, width, height } = node.absoluteBoundingBox;
-        console.log(`  • ${node.name}:`, {
-          type: node.type,
-          position: `(${Math.round(x)}, ${Math.round(y)})`,
-          size: `${Math.round(width)}x${Math.round(height)}`
-        });
-      }
+    if (validChildren.length === 0) {
+      throw new Error("No valid frames found in the tilemap. Please ensure there are visible frames inside the selected tilemap.");
+    }
+
+    console.log('📦 Found valid frames:', validChildren.length);
+
+    // Temporarily select all valid children for atlas creation
+    figma.currentPage.selection = validChildren;
+
+    // Step 1: Create the atlas
+    console.log('📦 Creating atlas...');
+    const atlasResult = await createAtlas(params);
+    if (!atlasResult.success) {
+      // Restore original selection
+      figma.currentPage.selection = [tileMapFrame];
+      console.error('❌ Atlas export failed');
+      throw new Error("Atlas export failed");
+    }
+    console.log('✅ Atlas created successfully:', atlasResult);
+
+    // Restore original selection
+    figma.currentPage.selection = [tileMapFrame];
+
+    // Step 2: Export the tile map
+    console.log('🗺️ Exporting tile map...');
+    // Create a new params object for tile map export
+    const tileMapParams = Object.assign({}, params, {
+      atlasData: atlasResult.atlas
     });
+    
+    const tileMapResult = await exportTileMap(tileMapParams);
+    if (!tileMapResult.success) {
+      console.error('❌ Tile map export failed');
+      throw new Error("Tile map export failed");
+    }
+    console.log('✅ Tile map exported successfully:', tileMapResult);
+
+    // Step 3: Combine and return both JSONs
+    console.log('🎯 Combining results...');
+    return {
+      success: true,
+      data: {
+        atlasJSON: atlasResult.atlas,
+        tileMapJSON: tileMapResult.exportData
+      }
+    };
+  } catch (error) {
+    // Ensure original selection is restored in case of error
+    if (selection && selection.length > 0) {
+      figma.currentPage.selection = selection;
+    }
+    console.error('❌ Combined export failed:', error);
+    return {
+      success: false,
+      error: error.message
+    };
   }
 }

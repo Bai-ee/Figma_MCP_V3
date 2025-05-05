@@ -3,6 +3,119 @@
   <head>
     <meta charset="utf-8" />
     <title>Cursor MCP Plugin</title>
+    <script>
+      // Console overrides - consolidated in one place
+      const originalConsoleLog = console.log;
+      const originalConsoleError = console.error;
+      const originalConsoleInfo = console.info;
+
+      // We'll define addLogEntry first since it's used by the console overrides
+      function addLogEntry(message, type = 'info', target = 'tools-log', shouldAutoScroll = false) {
+        const logContainer = document.getElementById(target);
+        if (!logContainer) return;
+
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${type}`;
+        
+        const timestamp = document.createElement('span');
+        timestamp.className = 'timestamp';
+        timestamp.textContent = new Date().toLocaleTimeString();
+        entry.appendChild(timestamp);
+
+        // Handle objects, arrays, and JSON strings
+        let jsonData = null;
+        let isJson = false;
+
+        // Try to parse if it's a JSON string
+        if (typeof message === 'string') {
+          try {
+            jsonData = JSON.parse(message);
+            isJson = true;
+          } catch (e) {
+            // Not a JSON string
+          }
+        } else if (typeof message === 'object' && message !== null) {
+          try {
+            JSON.stringify(message); // Test if stringifiable
+            jsonData = message;
+            isJson = true;
+          } catch (e) {
+            // Not JSON serializable
+          }
+        }
+
+        if (isJson) {
+          const content = document.createElement('pre');
+          content.className = 'json-content';
+          content.textContent = JSON.stringify(jsonData, null, 2);
+          
+          // Add download button for JSON data
+          const downloadBtn = document.createElement('button');
+          downloadBtn.textContent = '📥 Download JSON';
+          downloadBtn.className = 'download-button';
+          downloadBtn.onclick = () => {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const filename = `log_${timestamp}.json`;
+            const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          };
+          
+          entry.appendChild(content);
+          entry.appendChild(downloadBtn);
+        } else {
+          entry.appendChild(document.createTextNode(message));
+        }
+        
+        logContainer.appendChild(entry);
+        
+        // Keep only the last 100 entries
+        while (logContainer.children.length > 100) {
+          logContainer.removeChild(logContainer.firstChild);
+        }
+        
+        // Only scroll into view if explicitly requested and no download button is present
+        if (shouldAutoScroll && !entry.querySelector('.download-button')) {
+          entry.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+      }
+
+      // Now we can define the console overrides
+      console.log = function() {
+        // Call original console.log
+        originalConsoleLog.apply(console, arguments);
+        
+        // Process each argument
+        for (let arg of arguments) {
+          // Add to both log containers to ensure visibility
+          addLogEntry(arg, 'info', 'tools-log');
+          addLogEntry(arg, 'info', 'tile-log');
+        }
+      };
+
+      console.error = function() {
+        originalConsoleError.apply(console, arguments);
+        
+        const message = Array.from(arguments).join(' ');
+        addLogEntry(message, 'error', 'tools-log');
+        addLogEntry(message, 'error', 'tile-log');
+      };
+
+      console.info = function() {
+        originalConsoleInfo.apply(console, arguments);
+        
+        const message = Array.from(arguments).join(' ');
+        addLogEntry(message, 'info', 'tools-log');
+        addLogEntry(message, 'info', 'tile-log');
+      };
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
     <script>
       // Debug logging function
@@ -490,6 +603,49 @@
         margin-right: 8px;
       }
     </style>
+    <style>
+      /* ... existing styles ... */
+      
+      .log-entry {
+        margin: 10px 0;
+        padding: 10px;
+        background: #f5f5f5;
+        border-radius: 4px;
+        border-left: 4px solid #2196F3;
+      }
+
+      .timestamp {
+        color: #666;
+        font-size: 0.8em;
+        margin-bottom: 5px;
+        display: block;
+      }
+
+      .structured-data {
+        background: #fff;
+        padding: 10px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 12px;
+        overflow-x: auto;
+        margin: 5px 0;
+      }
+
+      .button {
+        background-color: #2196F3;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background-color 0.2s;
+      }
+
+      .button:hover {
+        background-color: #1976D2;
+      }
+    </style>
     <script>
       // Debug logging function
       function debugLog(step, details) {
@@ -780,12 +936,45 @@
           <button id="createAtlas" class="button">Create Atlas</button>
           
           <!-- Atlas Status and Download Section -->
-          <!-- Removing atlas-section to simplify UI while maintaining functionality -->
+          <div id="atlas-section" class="section">
+            <div id="atlas-status" class="status info">
+              No atlas created yet
+            </div>
+            
+            <div id="atlas-progress" class="progress-container">
+              <div class="progress-bar">
+                <div class="progress-fill"></div>
+              </div>
+              <div class="progress-text">Processing...</div>
+            </div>
+            
+            <div id="atlas-download" class="download-section">
+              <h3>Atlas Files</h3>
+              <div class="file-list">
+                <div class="file-item">
+                  <span class="file-name">atlas.png</span>
+                  <span class="file-size"></span>
+                </div>
+                <div class="file-item">
+                  <span class="file-name">atlas.json</span>
+                  <span class="file-size"></span>
+                </div>
+              </div>
+              <div class="download-buttons">
+                <button id="downloadAtlas" class="button">Download Atlas (ZIP)</button>
+                <button id="clearAtlas" class="button secondary">Clear Atlas</button>
+              </div>
+            </div>
+          </div>
           
           <h2>Export Tile Map</h2>
           <label>View Tile Map JSON with map and item coordinates</label>
           <button id="exportTileMap" class="button">Export Tile Map</button>
-          
+
+          <h2>Combined Export</h2>
+          <label>Export both Atlas and Tile Map JSON</label>
+          <button id="exportAtlasTileMap" class="button">Export Combined</button>
+
           <h2>Create Tile Map</h2>
           <div class="form-group">
             <label for="frameWidth">Frame Width (px):</label>
@@ -1660,7 +1849,7 @@
 
       // Add this function after the generateId() function
       function generateChannelName() {
-        const characters = "abcdefghijklmnopqrstuvwxyz0123456789";
+        const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         let result = "";
         for (let i = 0; i < 8; i++) {
           result += characters.charAt(
@@ -1670,47 +1859,17 @@
         return result;
       }
 
-      // Override console.log to also write to log containers
-      const originalConsoleLog = console.log;
-      const originalConsoleError = console.error;
-      const originalConsoleInfo = console.info;
-
-      function stringifyWithArrays(obj) {
-        if (typeof obj !== 'object' || obj === null) {
-          return obj;
-        }
-        return JSON.stringify(obj, (key, value) => {
-          if (Array.isArray(value)) {
-            return value;
-          }
-          if (typeof value === 'object' && value !== null) {
-            const simpleObj = {};
-            Object.keys(value).forEach(k => {
-              simpleObj[k] = value[k];
-            });
-            return simpleObj;
-          }
-          return value;
-        }, 2);
-      }
-
+      // Keep the enhanced console.log override with JSON download functionality
       console.log = function() {
         // Call original console.log
         originalConsoleLog.apply(console, arguments);
         
-        // Convert all arguments to strings and join them
-        const message = Array.from(arguments)
-          .map(arg => {
-            if (typeof arg === 'object' && arg !== null) {
-              return stringifyWithArrays(arg);
-            }
-            return String(arg);
-          })
-          .join(' ');
-        
-        // Add to both log containers to ensure visibility
-        addLogEntry(message, 'info', 'tools-log');
-        addLogEntry(message, 'info', 'tile-log');
+        // Process each argument
+        for (let arg of arguments) {
+          // Add to both log containers to ensure visibility
+          addLogEntry(arg, 'info', 'tools-log');
+          addLogEntry(arg, 'info', 'tile-log');
+        }
       };
 
       console.error = function() {
@@ -1745,7 +1904,7 @@
         addLogEntry(message, 'info', 'tile-log');
       };
 
-      // Enhanced log entry function
+      // Enhanced log entry function with JSON download capability
       function addLogEntry(message, type = 'info', target = 'tools-log', shouldAutoScroll = false) {
         const logContainer = document.getElementById(target);
         if (!logContainer) return;
@@ -1758,33 +1917,54 @@
         timestamp.textContent = new Date().toLocaleTimeString();
         entry.appendChild(timestamp);
 
-        // Handle objects and arrays - improved JSON handling
-        if (typeof message === 'string' && (message.startsWith('{') || message.startsWith('['))) {
-          try {
-            const parsed = JSON.parse(message);
-            const content = document.createElement('pre');
-            content.className = 'structured-data';
-            content.textContent = JSON.stringify(parsed, null, 2);
-            
-            // Add a download button for JSON data
-            const downloadButton = document.createElement('button');
-            downloadButton.className = 'download-button secondary';
-            downloadButton.style.marginTop = '8px';
-            downloadButton.style.marginBottom = '8px';
-            downloadButton.textContent = 'Download JSON';
-            downloadButton.onclick = () => downloadJSON(parsed);
-            
-            entry.appendChild(content);
-            entry.appendChild(downloadButton);
+        // Handle objects, arrays, and JSON strings
+        let jsonData = null;
+        let isJson = false;
 
-            // Auto scroll to the download button and focus it
-            setTimeout(() => {
-              downloadButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              downloadButton.focus();
-            }, 100);
+        // Try to parse if it's a JSON string
+        if (typeof message === 'string') {
+          try {
+            jsonData = JSON.parse(message);
+            isJson = true;
           } catch (e) {
-            entry.appendChild(document.createTextNode(message));
+            // Not a JSON string
           }
+        } else if (typeof message === 'object' && message !== null) {
+          try {
+            JSON.stringify(message); // Test if stringifiable
+            jsonData = message;
+            isJson = true;
+          } catch (e) {
+            // Not JSON serializable
+          }
+        }
+
+        if (isJson) {
+          const content = document.createElement('pre');
+          content.className = 'json-content';
+          content.textContent = JSON.stringify(jsonData, null, 2);
+          
+          // Add download button for JSON data
+          const downloadBtn = document.createElement('button');
+          downloadBtn.textContent = '📥 Download JSON';
+          downloadBtn.className = 'download-button';
+          downloadBtn.onclick = () => {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const filename = `log_${timestamp}.json`;
+            const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          };
+          
+          entry.appendChild(content);
+          entry.appendChild(downloadBtn);
         } else {
           entry.appendChild(document.createTextNode(message));
         }
@@ -1801,6 +1981,42 @@
           entry.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }
       }
+
+      // Add CSS for JSON logging
+      const style = document.createElement('style');
+      style.textContent = `
+        .json-content {
+          background: #1e1e1e;
+          padding: 8px;
+          border-radius: 4px;
+          margin: 4px 0;
+          white-space: pre-wrap;
+          font-family: monospace;
+          max-height: 300px;
+          overflow-y: auto;
+        }
+        
+        .download-button {
+          background: #2d2d2d;
+          border: 1px solid #444;
+          color: #fff;
+          padding: 4px 8px;
+          border-radius: 4px;
+          cursor: pointer;
+          margin-top: 4px;
+          font-size: 12px;
+        }
+        
+        .download-button:hover {
+          background: #3d3d3d;
+        }
+        
+        .timestamp {
+          color: #888;
+          margin-right: 8px;
+        }
+      `;
+      document.head.appendChild(style);
 
       // Tab switching
       tabs.forEach((tab) => {
@@ -2054,6 +2270,96 @@
                   addLogEntry(`❌ Error processing Atlas JSON: ${error.message}`, 'error');
               }
               break;
+
+            case 'command-result':
+              if (message.command === 'export-atlas-tilemap') {
+                if (message.result.success) {
+                  try {
+                    const { atlasJSON, tileMapJSON } = message.result.data;
+                    
+                    // Create log entries for both JSONs
+                    addLogEntry('🎯 Atlas and Tile Map Export Results:', 'info');
+                    
+                    // Atlas JSON
+                    const atlasEntry = document.createElement('div');
+                    atlasEntry.className = 'log-entry';
+                    const atlasTimestamp = document.createElement('span');
+                    atlasTimestamp.className = 'timestamp';
+                    atlasTimestamp.textContent = new Date().toLocaleTimeString();
+                    atlasEntry.appendChild(atlasTimestamp);
+                    
+                    const atlasContent = document.createElement('pre');
+                    atlasContent.className = 'structured-data';
+                    atlasContent.textContent = JSON.stringify(atlasJSON, null, 2);
+                    atlasEntry.appendChild(atlasContent);
+
+                    // Add Atlas download button
+                    const atlasDownloadBtn = document.createElement('button');
+                    atlasDownloadBtn.className = 'button';
+                    atlasDownloadBtn.textContent = 'Download Atlas JSON';
+                    atlasDownloadBtn.style.marginTop = '10px';
+                    atlasDownloadBtn.onclick = () => {
+                      const blob = new Blob([JSON.stringify(atlasJSON, null, 2)], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `atlas-${new Date().toISOString().slice(0,19).replace(/[:-]/g, '')}.json`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    };
+                    atlasEntry.appendChild(atlasDownloadBtn);
+                    
+                    // Tile Map JSON
+                    const tileMapEntry = document.createElement('div');
+                    tileMapEntry.className = 'log-entry';
+                    const tileMapTimestamp = document.createElement('span');
+                    tileMapTimestamp.className = 'timestamp';
+                    tileMapTimestamp.textContent = new Date().toLocaleTimeString();
+                    tileMapEntry.appendChild(tileMapTimestamp);
+                    
+                    const tileMapContent = document.createElement('pre');
+                    tileMapContent.className = 'structured-data';
+                    tileMapContent.textContent = JSON.stringify(tileMapJSON, null, 2);
+                    tileMapEntry.appendChild(tileMapContent);
+
+                    // Add Tile Map download button
+                    const tileMapDownloadBtn = document.createElement('button');
+                    tileMapDownloadBtn.className = 'button';
+                    tileMapDownloadBtn.textContent = 'Download Tile Map JSON';
+                    tileMapDownloadBtn.style.marginTop = '10px';
+                    tileMapDownloadBtn.onclick = () => {
+                      const blob = new Blob([JSON.stringify(tileMapJSON, null, 2)], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `tilemap-${new Date().toISOString().slice(0,19).replace(/[:-]/g, '')}.json`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    };
+                    tileMapEntry.appendChild(tileMapDownloadBtn);
+                    
+                    // Add to tools-log container
+                    const logContainer = document.getElementById('tools-log');
+                    if (logContainer) {
+                      logContainer.appendChild(atlasEntry);
+                      logContainer.appendChild(tileMapEntry);
+                      tileMapEntry.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                    }
+                    
+                    addLogEntry('✅ Combined export completed successfully!', 'success');
+                  } catch (error) {
+                    addLogEntry(`❌ Error processing combined export: ${error.message}`, 'error');
+                    console.error('Full error:', error);
+                  }
+                } else {
+                  addLogEntry(`❌ Combined export failed: ${message.result.error}`, 'error');
+                }
+              }
+              break;
         }
       };
 
@@ -2079,17 +2385,6 @@
         document.body.appendChild(container);
         return container;
       }
-
-      // Add styles for log entries
-      const style = document.createElement('style');
-      style.textContent = `
-        .log-entry {
-          margin: 4px 0;
-          white-space: pre-wrap;
-          word-break: break-word;
-        }
-      `;
-      document.head.appendChild(style);
 
       document.addEventListener('DOMContentLoaded', () => {
         // Add clear logs button handler
@@ -2666,6 +2961,21 @@
             parent.postMessage({ pluginMessage: command }, '*');
           };
         }
+
+        // Add Combined Export button handler
+        const exportAtlasTileMapBtn = document.getElementById('exportAtlasTileMap');
+        if (exportAtlasTileMapBtn) {
+          exportAtlasTileMapBtn.onclick = () => {
+            addLogEntry('Starting combined atlas and tile map export...', 'info');
+            parent.postMessage({ 
+              pluginMessage: { 
+                type: 'execute-command',
+                command: 'export-atlas-tilemap',
+                params: {}
+              }
+            }, '*');
+          };
+        }
       });
 
       // Add showNotification function
@@ -2942,71 +3252,131 @@
 
           switch (msg.type) {
             case 'export-atlas-complete':
-            case 'command-result':
-              console.log('Processing atlas data:', msg);
+              console.log('Received atlas export:', msg);
               try {
-                let atlasData;
-                
-                // Handle both message types
-                if (msg.type === 'export-atlas-complete') {
-                  atlasData = msg.data;
-                } else if (msg.type === 'command-result' && msg.result.success && msg.result.atlas) {
-                  atlasData = msg.result.atlas;
-                }
+                // Store the data for potential ZIP download later
+                window.atlasData = msg.data;
 
-                if (atlasData) {
-                  // Store the atlas data
-                  window.atlasData = atlasData;
-                  
-                  // Update UI elements
-                  const atlasStatus = document.getElementById('atlas-status');
-                  const progressFill = document.querySelector('.progress-fill');
-                  const progressText = document.querySelector('.progress-text');
-                  const atlasDownload = document.getElementById('atlas-download');
-                  
-                  // Update progress
-                  progressFill.style.width = '100%';
-                  progressText.textContent = 'Atlas created successfully!';
-                  
-                  // Update status
-                  atlasStatus.textContent = 'Atlas created successfully!';
-                  atlasStatus.className = 'status connected';
-                  
-                  // Show download section
-                  atlasDownload.classList.remove('hidden');
-                  
-                  // Add to logs
-                  addLogEntry('Atlas created successfully!', 'success');
-                  addStructuredLogEntry(atlasData, 'success');
-                  
-                  // Create immediate download link for JSON
-                  const jsonBlob = new Blob([JSON.stringify(atlasData, null, 2)], { type: 'application/json' });
-                  const jsonUrl = URL.createObjectURL(jsonBlob);
-                  const downloadLink = document.createElement('a');
-                  downloadLink.href = jsonUrl;
-                  downloadLink.download = `atlas_${Date.now()}.json`;
-                  downloadLink.textContent = 'Download Atlas JSON';
-                  downloadLink.className = 'button';
-                  downloadLink.style.marginTop = '10px';
-                  
-                  // Add download link to the log entry
-                  const logContainer = document.getElementById('tools-log');
-                  logContainer.appendChild(downloadLink);
-                  
-                  // Clean up URL after a delay
-                  setTimeout(() => URL.revokeObjectURL(jsonUrl), 1000);
+                // Create a formatted display of both the JSON and PNG data
+                const logEntry = document.createElement('div');
+                logEntry.className = 'log-entry';
+                
+                const timestamp = document.createElement('span');
+                timestamp.className = 'timestamp';
+                timestamp.textContent = new Date().toLocaleTimeString();
+                logEntry.appendChild(timestamp);
+                
+                // Add the JSON content in a pre element
+                const content = document.createElement('pre');
+                content.className = 'structured-data';
+                content.textContent = JSON.stringify(msg.data.json, null, 2);
+                logEntry.appendChild(content);
+                
+                // Create download buttons container
+                const buttonContainer = document.createElement('div');
+                buttonContainer.className = 'download-actions';
+                buttonContainer.style.display = 'flex';
+                buttonContainer.style.gap = '8px';
+                buttonContainer.style.marginTop = '10px';
+
+                // JSON Download button
+                const downloadJsonBtn = document.createElement('button');
+                downloadJsonBtn.textContent = 'Download Atlas JSON';
+                downloadJsonBtn.className = 'button';
+                downloadJsonBtn.onclick = () => {
+                  const blob = new Blob([JSON.stringify(msg.data.json, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `atlas_${Date.now()}.json`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                };
+
+                // PNG Download button
+                const downloadPngBtn = document.createElement('button');
+                downloadPngBtn.textContent = 'Download Atlas PNG';
+                downloadPngBtn.className = 'button';
+                downloadPngBtn.onclick = () => {
+                  const blob = new Blob([new Uint8Array(msg.data.png)], { type: 'image/png' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `atlas_${Date.now()}.png`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                };
+
+                // Add buttons to container
+                buttonContainer.appendChild(downloadJsonBtn);
+                buttonContainer.appendChild(downloadPngBtn);
+                logEntry.appendChild(buttonContainer);
+                
+                // Add to tools-log container
+                const logContainer = document.getElementById('tools-log');
+                if (logContainer) {
+                  logContainer.appendChild(logEntry);
+                  // Scroll to the new entry
+                  logEntry.scrollIntoView({ behavior: 'smooth', block: 'end' });
                 }
+                
+                addLogEntry('✅ Atlas files generated successfully!', 'success');
               } catch (error) {
-                console.error('Error processing atlas data:', error);
-                addLogEntry('Error processing atlas data: ' + error.message, 'error');
-                
-                // Update UI to show error
-                const atlasStatus = document.getElementById('atlas-status');
-                const progressText = document.querySelector('.progress-text');
-                
-                atlasStatus.textContent = 'Error creating atlas: ' + error.message;
-                atlasStatus.className = 'status error';
-                progressText.textContent = 'Error occurred';
+                console.error('Error handling atlas export:', error);
+                addLogEntry(`❌ Error processing atlas data: ${error.message}`, 'error');
+              }
+              break;
+
+            // Handle other message types...
+            default:
+              // If the message contains JSON data, format it consistently
+              if (msg.data && typeof msg.data === 'object') {
+                try {
+                  const logEntry = document.createElement('div');
+                  logEntry.className = 'log-entry';
+                  
+                  const timestamp = document.createElement('span');
+                  timestamp.className = 'timestamp';
+                  timestamp.textContent = new Date().toLocaleTimeString();
+                  logEntry.appendChild(timestamp);
+                  
+                  const content = document.createElement('pre');
+                  content.className = 'structured-data';
+                  content.textContent = JSON.stringify(msg.data, null, 2);
+                  logEntry.appendChild(content);
+                  
+                  // Add download button
+                  const downloadBtn = document.createElement('button');
+                  downloadBtn.textContent = 'Download JSON';
+                  downloadBtn.className = 'button';
+                  downloadBtn.style.marginTop = '10px';
+                  downloadBtn.onclick = () => {
+                    const blob = new Blob([JSON.stringify(msg.data, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `data_${Date.now()}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  };
+                  logEntry.appendChild(downloadBtn);
+                  
+                  // Add to tools-log container
+                  const logContainer = document.getElementById('tools-log');
+                  if (logContainer) {
+                    logContainer.appendChild(logEntry);
+                    logEntry.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                  }
+                } catch (error) {
+                  console.error('Error handling JSON data:', error);
+                  addLogEntry(`❌ Error processing data: ${error.message}`, 'error');
+                }
               }
               break;
           }
@@ -3054,6 +3424,87 @@
           }
         } else {
           console.log('No JSON data available to download');
+        }
+      };
+
+      function addJsonLogEntry(data, type = 'info') {
+        const logContainer = document.getElementById('tools-log');
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${type}`;
+        
+        // Add timestamp
+        const timestamp = document.createElement('span');
+        timestamp.className = 'timestamp';
+        timestamp.textContent = new Date().toLocaleTimeString();
+        entry.appendChild(timestamp);
+        
+        // Add formatted JSON content
+        const content = document.createElement('pre');
+        content.className = 'json-content';
+        content.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+        entry.appendChild(content);
+        
+        // Add download button
+        const downloadBtn = document.createElement('button');
+        downloadBtn.textContent = '📥 Download JSON';
+        downloadBtn.className = 'download-button';
+        downloadBtn.onclick = () => {
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          const filename = `log_${timestamp}.json`;
+          const jsonData = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+          const blob = new Blob([jsonData], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        };
+        entry.appendChild(downloadBtn);
+        
+        logContainer.appendChild(entry);
+        logContainer.scrollTop = logContainer.scrollHeight;
+      }
+
+      // Override console.log to detect and handle JSON data
+      console.log = function() {
+        // Call original console.log
+        originalConsoleLog.apply(console, arguments);
+        
+        // Process each argument
+        for (let arg of arguments) {
+          let entry;
+          let isJson = false;
+          
+          // Check if the argument is JSON or can be stringified as JSON
+          if (typeof arg === 'object' && arg !== null) {
+            try {
+              JSON.stringify(arg);
+              isJson = true;
+            } catch (e) {
+              isJson = false;
+            }
+          } else if (typeof arg === 'string') {
+            try {
+              JSON.parse(arg);
+              isJson = true;
+            } catch (e) {
+              isJson = false;
+            }
+          }
+          
+          // If it's JSON data, use the JSON log entry
+          if (isJson) {
+            addJsonLogEntry(arg);
+          } else {
+            // Regular log entry for non-JSON data
+            const timestamp = new Date().toLocaleTimeString();
+            entry = `[${timestamp}] ${typeof arg === 'string' ? arg : JSON.stringify(arg)}`;
+            addLogEntry(entry);
+          }
         }
       };
     </script>
