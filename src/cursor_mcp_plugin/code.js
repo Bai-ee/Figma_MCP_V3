@@ -3314,6 +3314,37 @@ async function snapToGrid(params) {
   }
 }
 
+// Helper function to generate a hash for a node based on its visual characteristics
+function generateNodeHash(node) {
+  // Get node's export bytes as a hash identifier
+  const hash = {
+    type: node.type,
+    width: Math.round(node.width),
+    height: Math.round(node.height)
+  };
+  
+  // Add specific properties based on node type
+  switch(node.type) {
+    case 'RECTANGLE':
+    case 'ELLIPSE':
+      hash.fills = node.fills;
+      hash.strokes = node.strokes;
+      hash.effects = node.effects;
+      break;
+    case 'INSTANCE':
+    case 'COMPONENT':
+      hash.componentId = node.componentId;
+      break;
+    case 'FRAME':
+      hash.fills = node.fills;
+      hash.strokes = node.strokes;
+      hash.children = node.children.map(child => generateNodeHash(child));
+      break;
+  }
+  
+  return JSON.stringify(hash);
+}
+
 async function exportTileMap(params) {
   const commandId = generateCommandId();
   sendProgressUpdate(commandId, 'EXPORT_TILEMAP', 'STARTED', 0, 100, 0, '🚀 Starting tile map export...');
@@ -3337,6 +3368,10 @@ async function exportTileMap(params) {
   });
 
   sendProgressUpdate(commandId, 'EXPORT_TILEMAP', 'IN_PROGRESS', 30, 100, 30, `🔍 Processing ${validChildren.length} valid child elements...`);
+
+  // Get atlas data if provided in params
+  const atlasData = params.atlasData || null;
+  const atlasFrames = atlasData ? atlasData.frames || {} : {};
 
   // Process child elements
   const objects = validChildren.map((child, index) => {
@@ -3379,8 +3414,38 @@ async function exportTileMap(params) {
         objectType = 'sprite';
     }
 
+    // Check if object should be collidable and get collision data
+    const hasColliderTag = child.name.includes('#collider');
+    const atlasFrame = atlasFrames[`${child.name}.png`];
+    const hasCollisionInAtlas = atlasFrame && atlasFrame.collision;
+    const isCollidable = hasColliderTag || hasCollisionInAtlas;
+
+    // Get collision data from atlas or plugin data
+    let collisionData = null;
+    if (isCollidable) {
+      try {
+        // First try to get custom collision from plugin data
+        const customCollisionData = child.getPluginData('collisionData');
+        if (customCollisionData) {
+          const parsed = JSON.parse(customCollisionData);
+          collisionData = validateCollisionData(parsed.collision);
+        }
+        
+        // If no valid custom collision, use atlas collision
+        if (!collisionData && atlasFrame && atlasFrame.collision) {
+          collisionData = atlasFrame.collision;
+        }
+      } catch (e) {
+        console.warn(`Error processing collision data for ${child.name}:`, e);
+      }
+    }
+
+    // Handle rotation
+    const rotation = child.rotation || 0;
+    const hasRotation = rotation !== 0;
+
     // Build object data
-    return {
+    const objectData = {
       id: child.id,
       name: child.name || `Object_${index + 1}`,
       type: objectType,
@@ -3388,7 +3453,7 @@ async function exportTileMap(params) {
       y: relativeY,
       width: Math.round(bounds.width),
       height: Math.round(bounds.height),
-      rotation: child.rotation || 0,
+      collidable: isCollidable,
       properties: {
         figmaType: child.type,
         visible: child.visible,
@@ -3396,12 +3461,24 @@ async function exportTileMap(params) {
         blendMode: child.blendMode || 'NORMAL'
       }
     };
+
+    // Add rotation if present
+    if (hasRotation) {
+      objectData.rotation = rotation;
+    }
+
+    // Add collision data if available
+    if (collisionData) {
+      objectData.collision = collisionData;
+    }
+
+    return objectData;
   });
 
   sendProgressUpdate(commandId, 'EXPORT_TILEMAP', 'IN_PROGRESS', 90, 100, 90, '📦 Generating final export data...');
 
   // Get background color safely
-  let backgroundColor = { r: 1, g: 1, b: 1, a: 1 }; // default white
+  let backgroundColor = { r: 1, g: 1, b: 1, a: 1 };
   if (selectedFrame.backgrounds && 
       selectedFrame.backgrounds.length > 0 && 
       selectedFrame.backgrounds[0].color) {
@@ -3423,7 +3500,17 @@ async function exportTileMap(params) {
         blendMode: selectedFrame.blendMode || 'NORMAL'
       }
     },
-    objects: objects
+    objects: objects,
+    // Add summary of duplicates
+    duplicatesSummary: {
+      totalObjects: objects.length,
+      uniqueObjects: duplicateMap.size,
+      duplicateGroups: Array.from(duplicateInstances.entries()).map(([hash, instances]) => ({
+        originalId: duplicateMap.get(hash),
+        instanceCount: instances.length,
+        instances: instances
+      }))
+    }
   };
 
   // Log the complete export data for debugging
@@ -3760,27 +3847,51 @@ async function createAtlas(params = {}) {
   
   // Build frames array for JSON
   console.log('📝 Generating atlas JSON data...');
-  const framesArr = frames.map((frame) => ({
-    filename: `${frame.node.name}.png`,
-    rotated: false,
-    trimmed: false,
-    sourceSize: {
-      w: Math.round(frame.width),
-      h: Math.round(frame.height)
-    },
-    spriteSourceSize: {
-      x: 0,
-      y: 0,
-      w: Math.round(frame.width),
-      h: Math.round(frame.height)
-    },
-    frame: {
-      x: Math.round(frame.x),
-      y: Math.round(frame.y),
-      w: Math.round(frame.width),
-      h: Math.round(frame.height)
+  const framesArr = frames.map((frame) => {
+    const frameWidth = Math.round(frame.width);
+    const frameHeight = Math.round(frame.height);
+    
+    // Check for #nocollide tag
+    const hasNoCollideTag = frame.node.name.includes('#nocollide');
+    
+    // Get custom collision data from plugin data if available
+    let collisionData = null;
+    try {
+      const customCollisionData = frame.node.getPluginData('collisionData');
+      if (customCollisionData) {
+        const parsed = JSON.parse(customCollisionData);
+        collisionData = validateCollisionData(parsed.collision);
+      }
+    } catch (e) {
+      console.warn(`Invalid collision data for frame ${frame.node.name}:`, e);
     }
-  }));
+    
+    // Use custom collision data or generate default
+    const collision = !hasNoCollideTag ? (collisionData || generateDefaultCollision(frame)) : null;
+
+    return {
+      filename: `${frame.node.name}.png`,
+      rotated: false,
+      trimmed: false,
+      sourceSize: {
+        w: frameWidth,
+        h: frameHeight
+      },
+      spriteSourceSize: {
+        x: 0,
+        y: 0,
+        w: frameWidth,
+        h: frameHeight
+      },
+      frame: {
+        x: Math.round(frame.x),
+        y: Math.round(frame.y),
+        w: frameWidth,
+        h: frameHeight
+      },
+      collision: collision
+    };
+  });
 
   // Texture object
   const textureObj = {
@@ -4339,6 +4450,10 @@ async function exportTileMap(params) {
 
   sendProgressUpdate(commandId, 'EXPORT_TILEMAP', 'IN_PROGRESS', 30, 100, 30, `🔍 Processing ${validChildren.length} valid child elements...`);
 
+  // Get atlas data if provided in params
+  const atlasData = params.atlasData || null;
+  const atlasFrames = atlasData ? atlasData.frames || {} : {};
+
   // Process child elements
   const objects = validChildren.map((child, index) => {
     const progress = 30 + Math.floor((index / validChildren.length) * 60);
@@ -4380,8 +4495,38 @@ async function exportTileMap(params) {
         objectType = 'sprite';
     }
 
+    // Check if object should be collidable and get collision data
+    const hasColliderTag = child.name.includes('#collider');
+    const atlasFrame = atlasFrames[`${child.name}.png`];
+    const hasCollisionInAtlas = atlasFrame && atlasFrame.collision;
+    const isCollidable = hasColliderTag || hasCollisionInAtlas;
+
+    // Get collision data from atlas or plugin data
+    let collisionData = null;
+    if (isCollidable) {
+      try {
+        // First try to get custom collision from plugin data
+        const customCollisionData = child.getPluginData('collisionData');
+        if (customCollisionData) {
+          const parsed = JSON.parse(customCollisionData);
+          collisionData = validateCollisionData(parsed.collision);
+        }
+        
+        // If no valid custom collision, use atlas collision
+        if (!collisionData && atlasFrame && atlasFrame.collision) {
+          collisionData = atlasFrame.collision;
+        }
+      } catch (e) {
+        console.warn(`Error processing collision data for ${child.name}:`, e);
+      }
+    }
+
+    // Handle rotation
+    const rotation = child.rotation || 0;
+    const hasRotation = rotation !== 0;
+
     // Build object data
-    return {
+    const objectData = {
       id: child.id,
       name: child.name || `Object_${index + 1}`,
       type: objectType,
@@ -4389,7 +4534,7 @@ async function exportTileMap(params) {
       y: relativeY,
       width: Math.round(bounds.width),
       height: Math.round(bounds.height),
-      rotation: child.rotation || 0,
+      collidable: isCollidable,
       properties: {
         figmaType: child.type,
         visible: child.visible,
@@ -4397,6 +4542,18 @@ async function exportTileMap(params) {
         blendMode: child.blendMode || 'NORMAL'
       }
     };
+
+    // Add rotation if present
+    if (hasRotation) {
+      objectData.rotation = rotation;
+    }
+
+    // Add collision data if available
+    if (collisionData) {
+      objectData.collision = collisionData;
+    }
+
+    return objectData;
   });
 
   sendProgressUpdate(commandId, 'EXPORT_TILEMAP', 'IN_PROGRESS', 90, 100, 90, '📦 Generating final export data...');
@@ -4495,11 +4652,35 @@ async function exportAtlasWithTileMap(params) {
 
     console.log('📦 Found valid frames:', validChildren.length);
 
-    // Temporarily select all valid children for atlas creation
-    figma.currentPage.selection = validChildren;
+    // Create a map to track unique elements
+    const uniqueElements = new Map();
+    
+    // First pass: Identify unique elements
+    validChildren.forEach((child) => {
+      const hash = JSON.stringify({
+        type: child.type,
+        width: Math.round(child.width),
+        height: Math.round(child.height),
+        fills: child.fills,
+        strokes: child.strokes,
+        effects: child.effects,
+        componentId: child.type === 'INSTANCE' ? child.componentId : null
+      });
 
-    // Step 1: Create the atlas
-    console.log('📦 Creating atlas...');
+      if (!uniqueElements.has(hash)) {
+        uniqueElements.set(hash, child);
+      }
+    });
+
+    // Get only unique elements for the atlas
+    const uniqueNodes = Array.from(uniqueElements.values());
+    console.log('🎯 Unique elements found:', uniqueNodes.length);
+
+    // Temporarily select only unique elements for atlas creation
+    figma.currentPage.selection = uniqueNodes;
+
+    // Step 1: Create the atlas with unique elements only
+    console.log('📦 Creating atlas with unique elements...');
     const atlasResult = await createAtlas(params);
     if (!atlasResult.success) {
       // Restore original selection
@@ -4509,14 +4690,13 @@ async function exportAtlasWithTileMap(params) {
     }
     console.log('✅ Atlas created successfully:', atlasResult);
 
-    // Restore original selection
+    // Restore original selection for tile map export
     figma.currentPage.selection = [tileMapFrame];
 
-    // Step 2: Export the tile map
-    console.log('🗺️ Exporting tile map...');
-    // Create a new params object for tile map export
+    // Step 2: Export the tile map with atlas data for collision information
+    console.log('🗺️ Exporting tile map with collision data...');
     const tileMapParams = Object.assign({}, params, {
-      atlasData: atlasResult.atlas
+      atlasData: atlasResult.atlas // Pass atlas data to ensure collision info is available
     });
     
     const tileMapResult = await exportTileMap(tileMapParams);
@@ -4532,7 +4712,13 @@ async function exportAtlasWithTileMap(params) {
       success: true,
       data: {
         atlasJSON: atlasResult.atlas,
-        tileMapJSON: tileMapResult.exportData
+        tileMapJSON: tileMapResult.exportData,
+        stats: Object.assign({}, {
+          totalElements: validChildren.length,
+          uniqueElements: uniqueNodes.length,
+          duplicateElements: validChildren.length - uniqueNodes.length,
+          collidableElements: tileMapResult.exportData.objects.filter(obj => obj.collidable).length
+        })
       }
     };
   } catch (error) {
@@ -4546,4 +4732,70 @@ async function exportAtlasWithTileMap(params) {
       error: error.message
     };
   }
+}
+
+// Add these helper functions at the top level
+function validateCollisionData(collision) {
+  if (!collision || typeof collision !== 'object') return null;
+
+  // Validate based on collision type
+  switch (collision.type) {
+    case 'rectangle':
+      if (!validateNumericProps(collision, ['x', 'y', 'w', 'h'])) return null;
+      if (collision.w <= 0 || collision.h <= 0) return null;
+      return {
+        type: 'rectangle',
+        x: Math.max(0, collision.x),
+        y: Math.max(0, collision.y),
+        w: collision.w,
+        h: collision.h
+      };
+    
+    case 'circle':
+      if (!validateNumericProps(collision, ['x', 'y', 'radius'])) return null;
+      if (collision.radius <= 0) return null;
+      return {
+        type: 'circle',
+        x: Math.max(0, collision.x),
+        y: Math.max(0, collision.y),
+        radius: collision.radius
+      };
+    
+    case 'polygon':
+      if (!Array.isArray(collision.points) || collision.points.length < 3) return null;
+      const validPoints = collision.points.every(point => 
+        typeof point === 'object' && 
+        validateNumericProps(point, ['x', 'y'])
+      );
+      if (!validPoints) return null;
+      return {
+        type: 'polygon',
+        points: collision.points.map(p => ({ x: Math.max(0, p.x), y: Math.max(0, p.y) }))
+      };
+    
+    default:
+      return null;
+  }
+}
+
+function validateNumericProps(obj, props) {
+  return props.every(prop => 
+    typeof obj[prop] === 'number' && 
+    !isNaN(obj[prop]) && 
+    isFinite(obj[prop])
+  );
+}
+
+function generateDefaultCollision(frame, collisionPaddingPercent = 0.2) {
+  const frameWidth = Math.round(frame.width);
+  const frameHeight = Math.round(frame.height);
+  const collisionHeight = Math.floor(frameHeight * collisionPaddingPercent);
+  
+  return {
+    type: "rectangle",
+    x: 0,
+    y: frameHeight - collisionHeight,
+    w: frameWidth,
+    h: collisionHeight
+  };
 }
